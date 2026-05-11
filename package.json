@@ -1,0 +1,43 @@
+{
+  "name": "silent-mane",
+  "version": "0.0.1",
+  "description": "Local-first document management with markdown rendering, knowledge graph, and MCP server.",
+  "type": "module",
+  "bin": {
+    "mane": "./bin/mane.js"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "start": "vite preview",
+    "mcp": "tsx src/mcp/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "templates",
+    "src/mcp"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@toast-ui/editor": "^3.2.2",
+    "commander": "^12.1.0",
+    "cytoscape": "^3.30.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/cytoscape": "^3.21.4",
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

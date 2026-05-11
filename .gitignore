@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vite/
+.DS_Store
+*.log
+
+# Private knowledge — the structure is in templates/, the contents are yours
+docs/
+!docs/.gitkeep
