@@ -234,6 +234,11 @@ export function App() {
     }
   }, []);
 
+  const handleWikiLinkClick = useCallback((title: string) => {
+    const match = index?.docs.find((d) => d.title.toLowerCase() === title.toLowerCase());
+    if (match) selectDoc(match.path);
+  }, [index, selectDoc]);
+
   const handleEdit = useCallback((next: string) => {
     if (!activePath) return;
     setSaveState("dirty");
@@ -275,6 +280,7 @@ export function App() {
                 initialContent={activeDoc.content}
                 mode={docMode}
                 onChange={handleEdit}
+                onWikiLinkClick={handleWikiLinkClick}
               />
             </div>
           </>

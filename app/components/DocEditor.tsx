@@ -10,3 +10,5 @@ const DocEditorInner = dynamic(
 export function DocEditor(props: Props) {
   return <DocEditorInner {...props} />;
 }
+
+export type { Props };

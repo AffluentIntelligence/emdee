@@ -186,6 +186,24 @@ body {
 .editor-host { flex: 1; overflow: auto; }
 .editor-host .toastui-editor-defaultUI { border: none; }
 
+/* Rendered mode: hide toolbar + source pane, show preview full-width */
+.editor-host [data-mode="rendered"] .toastui-editor-toolbar,
+.editor-host [data-mode="rendered"] .toastui-editor-md-splitter,
+.editor-host [data-mode="rendered"] .toastui-editor-md-container .toastui-editor { display: none !important; }
+.editor-host [data-mode="rendered"] .toastui-editor-md-preview {
+  width: 100% !important;
+  border-left: none !important;
+  padding: 20px 24px !important;
+}
+
+/* Raw mode: hide preview pane + splitter, source fills width */
+.editor-host [data-mode="raw"] .toastui-editor-md-splitter,
+.editor-host [data-mode="raw"] .toastui-editor-md-preview { display: none !important; }
+.editor-host [data-mode="raw"] .toastui-editor-md-container .toastui-editor { width: 100% !important; }
+
+/* Wiki-links in the preview */
+.wiki-link { cursor: pointer; text-decoration: underline dotted; }
+
 .empty { padding: 32px; color: var(--muted); }
 
 .graph-wrap { display: flex; flex-direction: column; height: 100%; }
