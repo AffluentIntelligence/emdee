@@ -1,7 +1,12 @@
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { AppShell } from "./components/AppShell";
 
-// Public workspace — reads from the "public" namespace in blob (or local EMDEE_DOCS in dev).
-// Shows Sign In button in the sidebar instead of PAT Token.
-export default function PublicWorkspace() {
+export const dynamic = "force-dynamic";
+
+// Public workspace for unauthenticated visitors. Signed-in users go straight to their workspace.
+export default async function PublicWorkspace() {
+  const { userId } = await auth();
+  if (userId) redirect(`/${userId}`);
   return <AppShell namespace="public" />;
 }

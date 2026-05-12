@@ -20,7 +20,7 @@ import {
 import type { ToolContext } from "../lib/mcp/tools/types.js";
 
 const docsDir = path.resolve(process.env.EMDEE_DOCS ?? path.join(process.cwd(), "docs"));
-const ctx: ToolContext = { docsDir };
+const ctx: ToolContext = { mode: "local", docsDir };
 
 const server = new Server(
   {

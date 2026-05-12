@@ -1,4 +1,4 @@
-import { buildIndex } from "../../../core/indexer.js";
+import { loadVaultIndex } from "./vault.js";
 import type { ToolContext } from "./types.js";
 
 function json(value: unknown) {
@@ -10,16 +10,14 @@ function makeSnippet(content: string, query: string, radius = 60): string {
   if (i < 0) return "";
   const start = Math.max(0, i - radius);
   const end = Math.min(content.length, i + query.length + radius);
-  const prefix = start > 0 ? "…" : "";
-  const suffix = end < content.length ? "…" : "";
-  return prefix + content.slice(start, end).replace(/\s+/g, " ").trim() + suffix;
+  return (start > 0 ? "…" : "") + content.slice(start, end).replace(/\s+/g, " ").trim() + (end < content.length ? "…" : "");
 }
 
 export async function search(ctx: ToolContext, args: Record<string, unknown>): Promise<unknown> {
   const query = String(args.query ?? "").trim();
   if (!query) return json([]);
   const limit = Math.max(1, Math.min(50, Number(args.limit ?? 10)));
-  const idx = await buildIndex(ctx.docsDir);
+  const idx = await loadVaultIndex(ctx);
   const q = query.toLowerCase();
   const hits = idx.docs
     .map((d) => {
@@ -28,15 +26,7 @@ export async function search(ctx: ToolContext, args: Record<string, unknown>): P
       const contentHit = d.content.toLowerCase().includes(q);
       if (!titleHit && !summaryHit && !contentHit) return null;
       const score = (titleHit ? 3 : 0) + (summaryHit ? 2 : 0) + (contentHit ? 1 : 0);
-      return {
-        score,
-        ref: {
-          path: d.path,
-          title: d.title,
-          summary: d.summary,
-          snippet: titleHit ? "" : makeSnippet(d.content, query),
-        },
-      };
+      return { score, ref: { path: d.path, title: d.title, summary: d.summary, snippet: titleHit ? "" : makeSnippet(d.content, query) } };
     })
     .filter((x): x is { score: number; ref: { path: string; title: string; summary: string; snippet: string } } => x !== null)
     .sort((a, b) => b.score - a.score)

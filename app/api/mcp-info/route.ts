@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   const origin = new URL(request.url).origin;
-  // Cloud HTTP MCP command — requires a PAT token as the bearer credential.
-  const command = `claude mcp add emdee --transport http-sse ${origin}/api/mcp`;
+  // Cloud HTTP MCP command — client does OAuth on first connect, no token needed in the command.
+  const command = `claude mcp add emdee --transport http ${origin}/api/mcp`;
   return Response.json({ mode: "cloud", command });
 }
