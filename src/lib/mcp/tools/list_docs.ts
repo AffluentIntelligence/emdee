@@ -1,4 +1,4 @@
-import { buildIndex } from "../../../core/indexer.js";
+import { loadVaultIndex } from "./vault.js";
 import type { ToolContext } from "./types.js";
 
 function json(value: unknown) {
@@ -6,8 +6,6 @@ function json(value: unknown) {
 }
 
 export async function listDocs(ctx: ToolContext, _args: Record<string, unknown>): Promise<unknown> {
-  const idx = await buildIndex(ctx.docsDir);
-  return json(
-    idx.docs.map((d) => ({ path: d.path, title: d.title, summary: d.summary }))
-  );
+  const idx = await loadVaultIndex(ctx);
+  return json(idx.docs.map((d) => ({ path: d.path, title: d.title, summary: d.summary })));
 }

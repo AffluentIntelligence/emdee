@@ -401,42 +401,51 @@ export function App({ namespace }: { namespace: string }) {
               </div>
             </div>
           ) : null}
-          <div className="connect-section">
-            <span className="pat-label">Connect to Claude Code</span>
-            {mcpCommand ? (
-              <div className="connect-cmd-row">
-                <code className="pat-value connect-cmd" title={mcpCommand}>
-                  {mcpCommand.length > 28 ? mcpCommand.slice(0, 28) + "…" : mcpCommand}
-                </code>
-                <button
-                  className={`connect-copy-icon${mcpCopied ? " copied" : ""}`}
-                  onClick={copyMcpCommand}
-                  type="button"
-                  title="Copy MCP command"
-                  aria-label="Copy MCP command"
-                >
-                  {mcpCopied ? (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M2.5 7.5L5.5 10.5L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  ) : (
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <rect x="4.5" y="1.5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                      <path d="M2.5 4.5H2A1.5 1.5 0 0 0 .5 6v6A1.5 1.5 0 0 0 2 13.5h5.5A1.5 1.5 0 0 0 9 12v-.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                    </svg>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <span style={{ fontSize: 11, color: "var(--muted)" }}>Loading…</span>
-            )}
-            {!isOwnNamespace && !isSignedIn && (
-              <a href="/sign-in" className="connect-signin-link">Sign in to manage your vault</a>
-            )}
-            {isSignedIn && !isOwnNamespace && isPublicNamespace && (
-              <a href={`/${user?.id}`} className="connect-signin-link">Go to my workspace</a>
-            )}
-          </div>
+          {isOwnNamespace && (
+            <div className="connect-section">
+              <span className="pat-label">Connect to Claude Code</span>
+              {mcpCommand ? (
+                <div className="connect-cmd-row">
+                  <code className="pat-value connect-cmd" title={mcpCommand}>
+                    {mcpCommand.length > 28 ? mcpCommand.slice(0, 28) + "…" : mcpCommand}
+                  </code>
+                  <button
+                    className={`connect-copy-icon${mcpCopied ? " copied" : ""}`}
+                    onClick={copyMcpCommand}
+                    type="button"
+                    title="Copy MCP command"
+                    aria-label="Copy MCP command"
+                  >
+                    {mcpCopied ? (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <path d="M2.5 7.5L5.5 10.5L11.5 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <rect x="4.5" y="1.5" width="8" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+                        <path d="M2.5 4.5H2A1.5 1.5 0 0 0 .5 6v6A1.5 1.5 0 0 0 2 13.5h5.5A1.5 1.5 0 0 0 9 12v-.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>Loading…</span>
+              )}
+            </div>
+          )}
+          {isPublicNamespace && !isSignedIn && (
+            <div className="connect-section">
+              <a href="/sign-in" className="signin-btn">Sign in</a>
+              <span style={{ fontSize: 11, color: "var(--muted)", textAlign: "center" }}>
+                to create and manage your vault
+              </span>
+            </div>
+          )}
+          {isPublicNamespace && isSignedIn && !isOwnNamespace && (
+            <div className="connect-section">
+              <a href={`/${user?.id}`} className="signin-btn">Go to my workspace</a>
+            </div>
+          )}
           {canSync && (
             <div className="sync-section">
               <button

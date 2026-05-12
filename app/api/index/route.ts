@@ -46,6 +46,26 @@ export async function GET(request: Request) {
   const { blobs } = await list({ token, prefix });
   const mdBlobs = blobs.filter((b) => b.pathname.endsWith(".md"));
 
+  // Public namespace with no Blob docs: fall back to bundled templates
+  if (mdBlobs.length === 0 && ns === "public") {
+    const templatesDir = path.join(process.cwd(), "templates");
+    try {
+      const templateIndex = await buildIndex(templatesDir);
+      const filtered = {
+        ...templateIndex,
+        docs: templateIndex.docs.filter((d) => isPublicPath(d.path)),
+        edges: templateIndex.edges.filter((e) => {
+          const fromPublic = templateIndex.docs.some((d) => d.path === e.from && isPublicPath(d.path));
+          const toPublic = templateIndex.docs.some((d) => d.path === e.to && isPublicPath(d.path));
+          return fromPublic && toPublic;
+        }),
+      };
+      return Response.json(filtered, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return Response.json({ docs: [], edges: [], entry: null }, { headers: { "Cache-Control": "no-store" } });
+    }
+  }
+
   const files = await Promise.all(
     mdBlobs.map(async (b) => {
       const result = await get(b.pathname, { token, access: "private" });
