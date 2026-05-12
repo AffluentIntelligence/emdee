@@ -173,13 +173,14 @@ export function App() {
   const loadIndex = useCallback(async (preserveActive: boolean) => {
     try {
       const res = await fetch("/api/index", { cache: "no-store" });
+      if (!res.ok) throw new Error(`index fetch failed: ${res.status}`);
       const data: DocIndex = await res.json();
       setIndex(data);
       setActivePath((current) => {
         if (preserveActive && current && data.docs.some((d) => d.path === current)) {
           return current;
         }
-        return data.entry ?? data.docs[0]?.path ?? null;
+        return data.entry ?? data.docs?.[0]?.path ?? null;
       });
     } catch {
       setIndex({ docs: [], edges: [], entry: null });

@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const docsDir = process.env.SILENT_MANE_DOCS;
   if (!docsDir) {
-    return Response.json({ error: "SILENT_MANE_DOCS not set" }, { status: 500 });
+    return Response.json({ docs: [], edges: [], entry: null }, {
+      headers: { "Cache-Control": "no-store" },
+    });
   }
   const index = await buildIndex(path.resolve(docsDir));
   return Response.json(index, {
