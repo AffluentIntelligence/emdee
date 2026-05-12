@@ -7,12 +7,9 @@
     "mane": "./bin/mane.js"
   },
   "scripts": {
-    "dev": "vite",
-    "dev:next": "next dev",
-    "build": "tsc -b && vite build",
-    "build:next": "next build",
-    "start": "vite preview",
-    "start:next": "next start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "mcp": "tsx src/mcp/server.ts",
     "typecheck": "tsc --noEmit"
   },
