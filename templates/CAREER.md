@@ -4,7 +4,7 @@
 
 ## Child of
 
-* [[MANE]]
+* [[EMDEE]]
 
 ## Parent of
 

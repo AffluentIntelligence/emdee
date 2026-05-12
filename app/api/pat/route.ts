@@ -2,6 +2,8 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { adminClient, hashToken } from "@/src/lib/supabase/admin";
 
+export const dynamic = "force-dynamic";
+
 function generateToken(): string {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);

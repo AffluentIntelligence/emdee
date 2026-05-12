@@ -6,10 +6,14 @@ const App = dynamic(() => import("./App").then(m => ({ default: m.App })), {
   loading: () => null,
 });
 
-export function AppShell() {
+interface AppShellProps {
+  namespace: string;
+}
+
+export function AppShell({ namespace }: AppShellProps) {
   return (
     <div style={{ height: "100vh" }}>
-      <App />
+      <App namespace={namespace} />
     </div>
   );
 }

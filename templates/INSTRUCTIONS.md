@@ -2,7 +2,7 @@
 
 > Vault-level operating protocol — the recursive mirror of per-project [[INSTRUCTIONS]], scoped to the CEO role. Defines how agents operate at the vault level: weekly distillation cadence, cross-project routing via INBOX/OUTBOX, and what gets written to [[BRAIN]].
 
-[[MANE]] is the vault's identity. [[INFO]] holds the doc-system conventions. [[BRAIN]] holds the distilled cross-project wisdom. This doc holds the *operating protocol* — how the CEO agent (and any human standing in for it) actually works across all of those.
+[[EMDEE]] is the vault's identity. [[INFO]] holds the doc-system conventions. [[BRAIN]] holds the distilled cross-project wisdom. This doc holds the *operating protocol* — how the CEO agent (and any human standing in for it) actually works across all of those.
 
 ## Child of
 
@@ -27,7 +27,7 @@ Each role's detailed operating protocol lives in the scope-appropriate INSTRUCTI
 
 When the CEO agent starts a session:
 
-1. Read [[MANE]] for vault identity (cheap, ~200 tokens).
+1. Read [[EMDEE]] for vault identity (cheap, ~200 tokens).
 2. Read [[BRAIN]] for cross-project priors (small, ~2K tokens).
 3. List recent OUTBOX entries across all projects (via `list_docs` + targeted `get_doc` on each `projects/<P>/OUTBOX.md`).
 4. List recent LEARNINGS additions across all projects.
@@ -50,7 +50,7 @@ When the CEO sees a pattern that warrants action in a project, it writes to that
 ### Boundaries
 
 - CEO never writes to BUILD, LOGS, or CONTEXT of any project. Those belong to per-project agents.
-- CEO writes to BRAIN, project INBOXes, and (rarely) MANE.md and this INSTRUCTIONS doc itself for protocol updates.
+- CEO writes to BRAIN, project INBOXes, and (rarely) EMDEE.md and this INSTRUCTIONS doc itself for protocol updates.
 - CEO never deletes existing LEARNINGS or BRAIN entries. To supersede, write a new entry that explicitly cites the old one (see [[INFO]] → Writing conventions → LEARNINGS authoring format).
 
 ## Writing discipline

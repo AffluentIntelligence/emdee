@@ -13,13 +13,13 @@ program.name("emdee").description("Emdee — local docs + knowledge graph + MCP"
 
 program
   .command("init")
-  .description("Create a docs/ folder seeded with SILENTMANE.md, TEMPLATE.md, and a SAMPLE_* example set")
+  .description("Create a docs/ folder seeded with EMDEE.md and supporting templates")
   .action(async () => {
     const cwd = process.cwd();
     const docsDir = path.join(cwd, "docs");
     await mkdir(docsDir, { recursive: true });
     const seeds = [
-      "MANE.md",
+      "EMDEE.md",
       "VAULT.md",
       "INFO.md",
       "INSTRUCTIONS.md",

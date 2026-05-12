@@ -2,7 +2,7 @@
 
 > Conventions and reference for this Emdee vault. Humans browse these files in the renderer; agents (Claude, Cursor, Codex) read the same files through an MCP server. Both audiences see identical bytes — anything the LLM says is traceable back to a file you wrote.
 
-[[MANE]] is the thin entry point. This doc holds the bulk of the conventions, the relationship rules, and the MCP tool reference. Read it once when you start a vault, refer back to it when you forget how something works.
+[[EMDEE]] is the thin entry point. This doc holds the bulk of the conventions, the relationship rules, and the MCP tool reference. Read it once when you start a vault, refer back to it when you forget how something works.
 
 The [[SAMPLE]] branch under this doc contains worked examples ([[TEMPLATE]], [[ACME WORKSPACE]], [[ATLAS SEARCH]], [[QUERY ROUTER]], [[MAYA CHEN]]) that demonstrate every convention in real content. Delete that whole branch when you no longer need it.
 
@@ -12,7 +12,7 @@ The [[SAMPLE]] branch under this doc contains worked examples ([[TEMPLATE]], [[A
 
 ## Associated with
 
-* [[SILENTMANE]] — the software that implements these conventions; this is the project under [[PROJECTS]] that powers the vault renderer and the MCP
+* [[EMDEE]] — the software that implements these conventions; this is the project under [[PROJECTS]] that powers the vault renderer and the MCP
 
 ## Parent of
 
@@ -48,10 +48,10 @@ Nest under `docs/` (e.g. `docs/projects/`, `docs/people/`). The indexer walks re
 Filename matches the doc's H1 with spaces converted to hyphens. ASCII only.
 
 - H1 `MAYA CHEN`        →  filename `MAYA-CHEN.md`
-- H1 `SILENTMANE`       →  filename `SILENTMANE.md`
+- H1 `EMDEE`            →  filename `EMDEE.md`
 - H1 `ATLAS SEARCH`     →  filename `ATLAS-SEARCH.md`
 
-Tier files inside a project folder (`BUILD.md`, `LOGS.md`, `LEARNINGS.md`, `BRAND.md`, `IDEAS.md`) are an exception: filename is the bare tier name; H1 is qualified with the project — `SILENTMANE — BUILD`. The sidebar strips the `PARENT — ` prefix at display time, so the tree shows just `BUILD` under the SILENTMANE branch.
+Tier files inside a project folder (`BUILD.md`, `LOGS.md`, `LEARNINGS.md`, `BRAND.md`, `IDEAS.md`) are an exception: filename is the bare tier name; H1 is qualified with the project — `EMDEE — BUILD`. The sidebar strips the `PARENT — ` prefix at display time, so the tree shows just `BUILD` under the EMDEE branch.
 
 ## Relationships
 
@@ -126,7 +126,7 @@ Provenance lives in the markdown — no metadata layer, no schema. Whatever wrot
 
 Sprints live as individual files at `docs/projects/<PROJECT>/sprints/SPRINT-NNN.md`. Each sprint earns its own file (not a section in BUILD) because close-outs grow over time and each sprint becomes a wiki-link target referenced from LEARNINGS, BRAIN, and elsewhere.
 
-**Numbering:** zero-padded, monotonically increasing per project. **Always call `list_docs` or `mane list` against the project's `sprints/` folder before picking the next sprint number** — never guess from memory.
+**Numbering:** zero-padded, monotonically increasing per project. **Always call `list_docs` or `emdee list` against the project's `sprints/` folder before picking the next sprint number** — never guess from memory.
 
 **H1 convention:** `PROJECT — SPRINT-NNN` (qualified for global uniqueness, same as tier files). The sidebar's prefix-trim displays just `SPRINT-NNN` under the project.
 
@@ -211,7 +211,7 @@ Entry shape (under 100 words each):
 
 ## MCP tools
 
-The MCP server (`mane mcp`) exposes:
+The MCP server (`emdee mcp`) exposes:
 
 - `list_docs` — every doc as `{path, title, summary}`. Cold-start enumeration.
 - `get_summary(path)` — one doc's `{path, title, summary}`. Cheap.
@@ -226,7 +226,7 @@ The MCP server (`mane mcp`) exposes:
 
 ## Suggested structure
 
-* `docs/MANE.md` — vault entry (identity, top-level pillars)
+* `docs/EMDEE.md` — vault entry (identity, top-level pillars)
 * `docs/VAULT.md` — vault-meta pillar anchor; groups INFO, INSTRUCTIONS, BRAIN
 * `docs/INFO.md` — vault conventions (how the doc system works)
 * `docs/INSTRUCTIONS.md` — vault-level operating protocol (CEO role: weekly distillation, cross-project routing)

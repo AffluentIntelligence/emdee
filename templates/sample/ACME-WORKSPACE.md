@@ -19,4 +19,4 @@ Acme is a 40-person company building internal tooling. The Atlas Search project 
 ## Notes
 
 * Use index docs sparingly — they earn their keep when you have at least 3–4 children worth grouping. One-child indexes are usually noise; just link directly.
-* The whole sample set is seeded by `mane init` purely to demonstrate conventions. Once you understand the structure, delete them with `rm -rf docs/sample/` and start writing your real vault.
+* The whole sample set is seeded by `emdee init` purely to demonstrate conventions. Once you understand the structure, delete them with `rm -rf docs/sample/` and start writing your real vault.

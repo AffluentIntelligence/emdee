@@ -1,4 +1,4 @@
-# MANE
+# EMDEE
 
 > Entry point for this Emdee vault. Read [[INFO]] for conventions and how the vault works. The top-level branches below are the categories you'll add real content under.
 

@@ -168,17 +168,10 @@ async function walk(dir: string, base: string): Promise<string[]> {
   return out;
 }
 
-export async function buildIndex(docsDir: string): Promise<DocIndex> {
-  try {
-    await stat(docsDir);
-  } catch {
-    return { docs: [], edges: [], entry: null };
-  }
-
-  const files = await walk(docsDir, docsDir);
+/** Build an index from pre-loaded file contents — works without a filesystem. */
+export function buildIndexFromContents(files: { path: string; content: string }[]): DocIndex {
   const docs: DocNode[] = [];
-  for (const rel of files) {
-    const content = await readFile(path.join(docsDir, rel), "utf8");
+  for (const { path: rel, content } of files) {
     const sections = extractSections(content);
     docs.push({
       path: rel,
@@ -228,9 +221,6 @@ export async function buildIndex(docsDir: string): Promise<DocIndex> {
     }
   }
 
-  // Entry point: canonical is mane.md. Override with EMDEE_ENTRY env var
-  // if a user wants a different filename. No silent fallback — if neither is
-  // present, entry is null and the UI surfaces "no entry doc".
   const overrideEntry = process.env.EMDEE_ENTRY?.toLowerCase();
   const entry =
     (overrideEntry
@@ -240,6 +230,22 @@ export async function buildIndex(docsDir: string): Promise<DocIndex> {
     null;
 
   return { docs, edges, entry };
+}
+
+export async function buildIndex(docsDir: string): Promise<DocIndex> {
+  try {
+    await stat(docsDir);
+  } catch {
+    return { docs: [], edges: [], entry: null };
+  }
+  const filePaths = await walk(docsDir, docsDir);
+  const files = await Promise.all(
+    filePaths.map(async (rel) => ({
+      path: rel,
+      content: await readFile(path.join(docsDir, rel), "utf8"),
+    }))
+  );
+  return buildIndexFromContents(files);
 }
 
 function dedupeLinks(links: Link[]): Link[] {
