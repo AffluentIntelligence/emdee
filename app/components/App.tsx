@@ -178,6 +178,7 @@ export function App() {
   const localEdit = useRef(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const collapsedInitialized = useRef(false);
+  const [navCollapsed, setNavCollapsed] = useState(false);
 
   const toggleCollapsed = useCallback((p: string) => {
     setCollapsed((prev) => {
@@ -284,11 +285,24 @@ export function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <h1>Emdee</h1>
-        <nav>
-          <button onClick={() => setView("doc")} data-active={view === "doc"}>Docs</button>
-          <button onClick={() => setView("graph")} data-active={view === "graph"}>Graph</button>
-        </nav>
+        <h1>EMDEE</h1>
+        <div className="nav-section">
+          <button
+            className="nav-section-header"
+            onClick={() => setNavCollapsed((v) => !v)}
+            aria-label={navCollapsed ? "Expand views" : "Collapse views"}
+            type="button"
+          >
+            <span className="nav-section-label">Views</span>
+            <span className="nav-section-chevron" data-collapsed={navCollapsed}>›</span>
+          </button>
+          {!navCollapsed && (
+            <nav>
+              <button onClick={() => setView("doc")} data-active={view === "doc"}>Docs</button>
+              <button onClick={() => setView("graph")} data-active={view === "graph"}>Graph</button>
+            </nav>
+          )}
+        </div>
         <DocTree
           nodes={docTree}
           parentPath={null}
