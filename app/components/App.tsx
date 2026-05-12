@@ -203,10 +203,24 @@ export function App({ namespace }: { namespace: string }) {
   const [syncState, setSyncState] = useState<"idle" | "syncing" | "done" | "error">("idle");
   const [conflicts, setConflicts] = useState<ConflictFile[]>([]);
   const [resolvingPath, setResolvingPath] = useState<string | null>(null);
+  const [mcpCommand, setMcpCommand] = useState<string | null>(null);
+  const [mcpCopied, setMcpCopied] = useState(false);
 
   useEffect(() => {
     fetch("/api/sync").then((r) => r.json()).then((d) => setCanSync(d.canSync)).catch(() => {});
+    fetch("/api/mcp-info").then((r) => r.json()).then((d) => setMcpCommand(d.command ?? null)).catch(() => {});
   }, []);
+
+  const copyMcpCommand = useCallback(() => {
+    const cmd = mcpCommand ?? (isOwnNamespace && patToken
+      ? `claude mcp add emdee --transport http-sse ${window.location.origin}/api/mcp`
+      : null);
+    if (!cmd) return;
+    navigator.clipboard.writeText(cmd).then(() => {
+      setMcpCopied(true);
+      setTimeout(() => setMcpCopied(false), 2500);
+    });
+  }, [mcpCommand, isOwnNamespace, patToken]);
 
   const handleSync = useCallback(async (force = false) => {
     setSyncState("syncing");
@@ -386,18 +400,28 @@ export function App({ namespace }: { namespace: string }) {
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="pat-section">
-              <a href="/sign-in" className="signin-btn">
-                {isPublicNamespace ? "Sign in" : "Sign in to edit"}
-              </a>
-              {isSignedIn && !isPublicNamespace && (
-                <span style={{ fontSize: 11, color: "var(--muted)", textAlign: "center" }}>
-                  Viewing someone else&apos;s vault
-                </span>
-              )}
-            </div>
-          )}
+          ) : null}
+          <div className="connect-section">
+            <span className="pat-label">Connect to Claude Code</span>
+            {mcpCommand ? (
+              <>
+                <code className="pat-value connect-cmd" title={mcpCommand}>
+                  {mcpCommand.length > 36 ? mcpCommand.slice(0, 36) + "…" : mcpCommand}
+                </code>
+                <button className="connect-copy-btn" onClick={copyMcpCommand} type="button">
+                  {mcpCopied ? "✓ Copied!" : "Copy command"}
+                </button>
+              </>
+            ) : (
+              <span style={{ fontSize: 11, color: "var(--muted)" }}>Loading…</span>
+            )}
+            {!isOwnNamespace && !isSignedIn && (
+              <a href="/sign-in" className="connect-signin-link">Sign in to manage your vault</a>
+            )}
+            {isSignedIn && !isOwnNamespace && isPublicNamespace && (
+              <a href={`/${user?.id}`} className="connect-signin-link">Go to my workspace</a>
+            )}
+          </div>
           {canSync && (
             <div className="sync-section">
               <button

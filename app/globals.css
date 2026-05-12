@@ -278,6 +278,42 @@ body {
 
 .empty { padding: 32px; color: var(--muted); }
 
+.connect-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.connect-cmd {
+  font-size: 10px !important;
+  cursor: default;
+  user-select: all;
+}
+.connect-copy-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+.connect-copy-btn:hover { opacity: 0.88; }
+.connect-signin-link {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  text-decoration: none;
+}
+.connect-signin-link:hover { color: var(--accent); }
+
 .signin-btn {
   display: block;
   text-align: center;
