@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const ns = url.searchParams.get("ns") ?? "public";
   const docsDir = process.env.EMDEE_DOCS;
+  console.log("[index] ns=%s docsDir=%s hasToken=%s", ns, docsDir ?? "none", !!process.env.BLOB_READ_WRITE_TOKEN);
 
   // Local dev: read from filesystem
   if (docsDir) {
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
 
   const prefix = ns.endsWith("/") ? ns : `${ns}/`;
   const { blobs } = await list({ token, prefix });
-  console.log("[index] ns=%s prefix=%s blobCount=%d", ns, prefix, blobs.length);
+  console.log("[index] prefix=%s blobCount=%d", prefix, blobs.length);
   const mdBlobs = blobs.filter((b) => b.pathname.endsWith(".md"));
 
   if (mdBlobs.length === 0) {
