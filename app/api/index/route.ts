@@ -40,13 +40,18 @@ export async function GET(request: Request) {
   // Cloud: read from Vercel Blob under the given namespace prefix
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
-    const envKeys = Object.keys(process.env).filter(k => k.includes("BLOB") || k.includes("TOKEN")).join(",");
-    return Response.json({ docs: [], edges: [], entry: null, _debug: `no token; blob-related keys: ${envKeys || "none"}` }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ docs: [], edges: [], entry: null, _debug: "no token" }, { headers: { "Cache-Control": "no-store" } });
   }
 
   const prefix = ns.endsWith("/") ? ns : `${ns}/`;
   const { blobs } = await list({ token, prefix });
   const mdBlobs = blobs.filter((b) => b.pathname.endsWith(".md"));
+  if (ns === "public") {
+    const firstBlob = mdBlobs[0];
+    const testFetch = firstBlob ? await fetch(firstBlob.url, { headers: { Authorization: `Bearer ${token}` } }) : null;
+    const testContent = testFetch?.ok ? (await testFetch.text()).slice(0, 40) : `fetch-status:${testFetch?.status ?? "no-blob"}`;
+    return Response.json({ docs: [], edges: [], entry: null, _debug: `blobs:${mdBlobs.length} first:${firstBlob?.pathname} fetch:${testContent}` }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   // Public namespace with no Blob docs: fall back to bundled templates
   if (mdBlobs.length === 0 && ns === "public") {
