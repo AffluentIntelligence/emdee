@@ -42,7 +42,14 @@ export async function GET(request: Request) {
 
   const storage = new SupabaseStorage();
   const prefix = `${ns}/`;
-  const listed = await storage.list(prefix);
+  let listed: Awaited<ReturnType<typeof storage.list>>;
+  try {
+    listed = await storage.list(prefix);
+  } catch (err) {
+    console.error("[index] storage.list error:", err);
+    listed = [];
+  }
+  console.log("[index] ns=%s listed=%d hasSecretKey=%s hasServiceKey=%s", ns, listed.length, !!process.env.SUPABASE_SECRET_KEY, !!process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   if (listed.length === 0) {
     return Response.json({ docs: [], edges: [], entry: null }, { headers: { "Cache-Control": "no-store" } });
