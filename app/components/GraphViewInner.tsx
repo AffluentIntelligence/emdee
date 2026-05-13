@@ -96,17 +96,6 @@ const CATEGORY_FILL: Record<Category, string> = {
   default: "#f3f4f6",
 };
 
-const CATEGORY_LABEL: Record<Category, string> = {
-  emdee: "Emdee",
-  vault: "Vault",
-  projects: "Projects",
-  people: "People",
-  hackathons: "Hackathons",
-  education: "Education",
-  career: "Career",
-  default: "Other",
-};
-
 // Path-based category detection. Pillars are detected by their root anchor
 // filename or by their folder prefix; tier files inherit the parent pillar.
 function categoryFor(rawPath: string): Category {
@@ -607,15 +596,6 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
         {onDeleteNode && (
           <button className="btn-danger" onClick={() => onDeleteNode(focalId!, focalDoc.title)}>Delete</button>
         )}
-        <span className="legend">
-          {(["projects", "people", "hackathons", "education", "career", "vault"] as Category[]).map((c) => (
-            <span key={c} className="legend-item">
-              <span className="dot" style={{ backgroundColor: CATEGORY_BASE[c] }} />
-              {CATEGORY_LABEL[c]}
-            </span>
-          ))}
-          <span className="legend-note">→ parent → child</span>
-        </span>
         <span className="spacer" />
         <span className="graph-page">
           {totalLayer1 === 0

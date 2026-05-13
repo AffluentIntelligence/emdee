@@ -290,6 +290,26 @@ body {
   height: 100%;
 }
 
+/* Split layout: graph (left) + doc (right), 50/50 */
+.main-split {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+.graph-pane,
+.doc-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.doc-pane {
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+}
+
 .toolbar {
   display: flex;
   align-items: center;
@@ -1032,13 +1052,26 @@ body {
     height: auto;
   }
 
+  /* On mobile, stack graph above doc instead of side-by-side */
+  .main-split {
+    flex-direction: column;
+  }
+  .graph-pane,
+  .doc-pane {
+    flex: 0 0 auto;
+    min-height: 50svh;
+  }
+  .doc-pane {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
   .graph-bar {
     overflow-x: auto;
     gap: 6px;
     padding: 8px 12px;
     -webkit-overflow-scrolling: touch;
   }
-  .graph-bar .legend { display: none; }
   .graph-stage { min-height: 60svh; }
 
   .modal { padding: 20px; }

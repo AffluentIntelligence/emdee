@@ -166,7 +166,7 @@ function DocTree({ nodes, parentPath, parentTitle, activePath, collapsed, onSele
   );
 }
 
-type View = "doc" | "graph" | "log";
+type View = "main" | "log";
 type DocMode = "raw" | "rendered";
 type SaveState = "idle" | "dirty" | "saving" | "saved" | "error";
 
@@ -210,7 +210,7 @@ export function App({ namespace }: { namespace: string }) {
 
   const [index, setIndex] = useState<DocIndex | null>(null);
   const [activePath, setActivePath] = useState<string | null>(null);
-  const [view, setView] = useState<View>("doc");
+  const [view, setView] = useState<View>("main");
   const [docMode, setDocMode] = useState<DocMode>("rendered");
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const saveTimer = useRef<number | null>(null);
@@ -626,10 +626,6 @@ export function App({ namespace }: { namespace: string }) {
               <a href={`/${user?.id}`} className="signin-btn">Go to my workspace</a>
             </div>
           )}
-          <nav>
-            <button onClick={() => { setView("doc"); setMobileSidebarOpen(false); }} data-active={view === "doc"}>Docs</button>
-            <button onClick={() => { setView("graph"); setMobileSidebarOpen(false); }} data-active={view === "graph"}>Graph</button>
-          </nav>
           <DocTree
             nodes={docTree}
             parentPath={null}
@@ -677,40 +673,47 @@ export function App({ namespace }: { namespace: string }) {
             </button>
           </div>
         )}
-        {view === "doc" && activeDoc && (
-          <>
-            <div className="toolbar">
-              <button onClick={() => setDocMode("rendered")} data-active={docMode === "rendered"}>Rendered</button>
-              <button onClick={() => setDocMode("raw")} data-active={docMode === "raw"}>Raw</button>
-              <span className="doc-path">{activeDoc.path}</span>
-              <span className="spacer" />
-              <span className="save-state">{labelFor(saveState)}</span>
+        {view === "main" && (
+          <div className="main-split">
+            <div className="graph-pane">
+              {index && (
+                <GraphView
+                  index={index}
+                  activePath={activePath}
+                  onSelect={setActivePath}
+                  onAddChild={isOwnNamespace ? openAddChild : undefined}
+                  onAddAssociation={isOwnNamespace ? openAddAssoc : undefined}
+                  onDeleteNode={isOwnNamespace ? openDeleteNode : undefined}
+                />
+              )}
             </div>
-            <div className="editor-host">
-              <DocEditor
-                path={activeDoc.path}
-                initialContent={activeDoc.content}
-                mode={docMode}
-                onChange={handleEdit}
-                onWikiLinkClick={handleWikiLinkClick}
-              />
+            <div className="doc-pane">
+              {activeDoc ? (
+                <>
+                  <div className="toolbar">
+                    <button onClick={() => setDocMode("rendered")} data-active={docMode === "rendered"}>Rendered</button>
+                    <button onClick={() => setDocMode("raw")} data-active={docMode === "raw"}>Raw</button>
+                    <span className="doc-path">{activeDoc.path}</span>
+                    <span className="spacer" />
+                    <span className="save-state">{labelFor(saveState)}</span>
+                  </div>
+                  <div className="editor-host">
+                    <DocEditor
+                      path={activeDoc.path}
+                      initialContent={activeDoc.content}
+                      mode={docMode}
+                      onChange={handleEdit}
+                      onWikiLinkClick={handleWikiLinkClick}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="empty">
+                  <p>Select a doc from the sidebar or graph to view it here.</p>
+                </div>
+              )}
             </div>
-          </>
-        )}
-        {view === "doc" && !activeDoc && (
-          <div className="empty">
-            <p>No docs found. Run <code>emdee init</code> in a directory to get started.</p>
           </div>
-        )}
-        {view === "graph" && index && (
-          <GraphView
-            index={index}
-            activePath={activePath}
-            onSelect={(p) => { setActivePath(p); setView("doc"); }}
-            onAddChild={isOwnNamespace ? openAddChild : undefined}
-            onAddAssociation={isOwnNamespace ? openAddAssoc : undefined}
-            onDeleteNode={isOwnNamespace ? openDeleteNode : undefined}
-          />
         )}
         {view === "log" && (
           <div className="log-view">
