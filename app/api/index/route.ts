@@ -18,6 +18,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const ns = url.searchParams.get("ns") ?? "public";
   const docsDir = process.env.EMDEE_DOCS;
+  if (url.searchParams.has("_dbg")) {
+    return Response.json({ docsDir: docsDir ?? null, hasToken: !!process.env.BLOB_READ_WRITE_TOKEN, runtime: process.version });
+  }
 
   // Local dev: read from filesystem; filter to public-safe docs when ns=public
   if (docsDir) {
