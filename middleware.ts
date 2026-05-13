@@ -1,12 +1,19 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// All routes are publicly accessible — auth is enforced per-operation in route handlers.
-// clerkMiddleware() still populates auth() / useUser() for routes that need it.
-// Bypass Clerk for API routes to test if Clerk dev-mode handshake is causing issue.
+// Public routes: no auth required.
+// API routes and OAuth flows handle their own auth (PAT / OAuth tokens).
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/sign-in(.*)",
+  "/api/(.*)",
+  "/.well-known/(.*)",
+  "/oauth/(.*)",
+]);
+
+// Protected routes (e.g. personal workspace) redirect to sign-in if not authenticated.
 export default clerkMiddleware((auth, req) => {
-  if (req.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.next();
+  if (!isPublicRoute(req)) {
+    auth.protect();
   }
 });
 
