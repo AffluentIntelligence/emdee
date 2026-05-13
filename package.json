@@ -8,8 +8,8 @@
     "emdee": "./bin/emdee.js"
   },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "mcp": "tsx src/mcp/server.ts",
