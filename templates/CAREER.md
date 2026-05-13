@@ -8,6 +8,6 @@
 
 ## Parent of
 
-* [[SETEL]]
-* [[ASIAVERIFY]]
-* [[PRUDENTIAL]]
+* [[COMPANY-A]]
+* [[COMPANY-B]]
+* [[COMPANY-C]]

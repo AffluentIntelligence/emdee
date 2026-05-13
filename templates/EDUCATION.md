@@ -1,6 +1,6 @@
 # EDUCATION
 
-> Index of schools attended. Past schools as single-file references (CLHS, TC); current school SIT has its own folder with active modules.
+> Index of schools attended. Past schools as single-file references; current school has its own folder with active modules.
 
 ## Child of
 
@@ -8,6 +8,6 @@
 
 ## Parent of
 
-* [[CLHS]]
-* [[TC]]
-* [[SIT]]
+* [[SCHOOL-A]]
+* [[SCHOOL-B]]
+* [[SCHOOL-C]]
