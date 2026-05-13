@@ -130,6 +130,6 @@ export async function POST(request: Request) {
 
 // GET /api/sync — returns whether sync is available (EMDEE_DOCS + Supabase configured)
 export async function GET() {
-  const canSync = !!(process.env.EMDEE_DOCS && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const canSync = !!(process.env.EMDEE_DOCS && (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY));
   return Response.json({ canSync });
 }
