@@ -19,7 +19,6 @@ interface SharedDoc {
 }
 
 const SHARED_PREFIX = "__shared:";
-const SHARED_ROOT_PATH = "__shared:__root";
 const sharedActiveKey = (s: SharedDoc) => `${SHARED_PREFIX}${s.ownerId}:${s.path}`;
 
 interface TreeNode {
@@ -470,18 +469,6 @@ export function App({ namespace }: { namespace: string }) {
   }, [activePath, sharedDocs]);
 
   const activeDoc = useMemo<DocNode | null>(() => {
-    if (activePath === SHARED_ROOT_PATH) {
-      return {
-        path: SHARED_ROOT_PATH,
-        title: "SHARED",
-        content: "# SHARED\n\n> Documents others have shared with you appear here.\n",
-        summary: "Documents others have shared with you appear here.",
-        parents: [],
-        children: [],
-        associates: [],
-        mentions: [],
-      };
-    }
     if (activeSharedDoc) {
       return {
         path: activeSharedDoc.path,
@@ -502,10 +489,12 @@ export function App({ namespace }: { namespace: string }) {
     [index]
   );
 
-  // Inject a synthetic SHARED branch under VAULT when there are docs shared
-  // with this user. The SHARED node and its children aren't real docs on
-  // disk — clicking them sets a sentinel activePath ("__shared:..." or
-  // "__shared:__root") that the doc pane treats as read-only.
+  // SHARED.md is a real doc seeded into every vault (see
+  // scripts/seed-shared-doc.mjs) — the indexer puts it under VAULT
+  // naturally. Here we attach synthetic, read-only children to it
+  // pointing at docs other users have shared in. The children carry the
+  // "__shared:<owner>:<path>" sentinel so the doc pane treats them as
+  // read-only and routes reads to the owner's namespace.
   const docTree = useMemo<TreeNode[]>(() => {
     if (sharedDocs.length === 0) return rawDocTree;
     const sharedChildren: TreeNode[] = sharedDocs.map((s) => ({
@@ -522,27 +511,26 @@ export function App({ namespace }: { namespace: string }) {
       depth: 0,
       children: [],
     }));
-    const sharedNode: TreeNode = {
-      doc: {
-        path: SHARED_ROOT_PATH,
-        title: "SHARED",
-        content: "# SHARED\n\n> Documents others have shared with you appear here.\n",
-        summary: "Documents others have shared with you appear here.",
-        parents: [],
-        children: [],
-        associates: [],
-        mentions: [],
-      },
-      depth: 0,
-      children: sharedChildren,
+
+    const attachToShared = (nodes: TreeNode[]): TreeNode[] | null => {
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (n.doc.title.toUpperCase() === "SHARED") {
+          const next = nodes.slice();
+          next[i] = { ...n, children: [...n.children, ...sharedChildren] };
+          return next;
+        }
+        const inChild = attachToShared(n.children);
+        if (inChild) {
+          const next = nodes.slice();
+          next[i] = { ...n, children: inChild };
+          return next;
+        }
+      }
+      return null;
     };
-    const vaultIdx = rawDocTree.findIndex((t) => t.doc.title.toUpperCase() === "VAULT");
-    if (vaultIdx === -1) return [...rawDocTree, sharedNode];
-    const vault = rawDocTree[vaultIdx];
-    const updatedVault: TreeNode = { ...vault, children: [...vault.children, sharedNode] };
-    const next = rawDocTree.slice();
-    next[vaultIdx] = updatedVault;
-    return next;
+
+    return attachToShared(rawDocTree) ?? rawDocTree;
   }, [rawDocTree, sharedDocs]);
 
   // Collapse all parent nodes on first load; leave user-driven toggles alone after that.
@@ -561,6 +549,34 @@ export function App({ namespace }: { namespace: string }) {
     collect(docTree);
     setCollapsed(parents);
   }, [docTree]);
+
+  // When shared docs arrive, expand the path from the root down to SHARED
+  // so the user actually sees them. One-shot — if they later collapse,
+  // we don't fight them.
+  const sharedExpandedRef = useRef(false);
+  useEffect(() => {
+    if (sharedExpandedRef.current) return;
+    if (sharedDocs.length === 0) return;
+    sharedExpandedRef.current = true;
+    const ancestors: string[] = [];
+    const findPathTo = (nodes: TreeNode[], targetTitle: string, trail: string[]): string[] | null => {
+      for (const n of nodes) {
+        const nextTrail = [...trail, n.doc.path];
+        if (n.doc.title.toUpperCase() === targetTitle) return nextTrail;
+        const r = findPathTo(n.children, targetTitle, nextTrail);
+        if (r) return r;
+      }
+      return null;
+    };
+    const trail = findPathTo(rawDocTree, "SHARED", []);
+    if (trail) ancestors.push(...trail);
+    if (ancestors.length === 0) return;
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      for (const p of ancestors) next.delete(p);
+      return next;
+    });
+  }, [sharedDocs, rawDocTree]);
 
   // Sidebar click sets the active path but preserves the current view —
   // in graph view it navigates the graph focus, in doc view it loads the doc.
@@ -968,10 +984,9 @@ export function App({ namespace }: { namespace: string }) {
               {activeDoc ? (() => {
                 const isSharedView = activePath?.startsWith(SHARED_PREFIX) ?? false;
                 const isSharedDoc = !!activeSharedDoc;
-                const isSharedRoot = activePath === SHARED_ROOT_PATH;
                 const displayPath = isSharedDoc
                   ? `${activeSharedDoc.ownerEmail ?? activeSharedDoc.ownerId.slice(0, 12)} / ${activeSharedDoc.path}`
-                  : isSharedRoot ? "VAULT / SHARED" : activeDoc.path;
+                  : activeDoc.path;
                 return (
                   <>
                     {isSharedDoc && (

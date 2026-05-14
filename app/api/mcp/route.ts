@@ -49,7 +49,14 @@ BEFORE writing or editing any doc:
 
 Key conventions:
 - Every doc starts with one H1 + one > blockquote summary immediately below it.
-- Sprints: Child of [[PROJECT — BUILD]] if active/spec, Child of [[PROJECT — LOGS]] if shipped.`,
+- Sprints: Child of [[PROJECT — BUILD]] if active/spec, Child of [[PROJECT — LOGS]] if shipped.
+
+Shared docs:
+- Paths starting with "__shared__/<owner_id>/" are docs another user has
+  shared into this vault. They appear in list_docs and are readable via
+  get_doc / get_summary / search, but every write tool (write_doc,
+  patch_section, append_section, delete_doc, split_doc) will refuse them.
+  If you need to edit one, ask the user to talk to the owner.`,
     }
   );
 
