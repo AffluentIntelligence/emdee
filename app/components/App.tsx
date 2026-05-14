@@ -197,12 +197,6 @@ interface ConflictFile {
   manifestSyncedAt: string;
 }
 
-function generatePat(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 export function App({ namespace }: { namespace: string }) {
   const { user, isSignedIn } = useUser();
   const isOwnNamespace = isSignedIn && user?.id === namespace;
@@ -218,8 +212,6 @@ export function App({ namespace }: { namespace: string }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const collapsedInitialized = useRef(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [patToken, setPatToken] = useState<string | null>(null);
-  const [patCopied, setPatCopied] = useState(false);
   const [canSync, setCanSync] = useState(false);
   const [syncState, setSyncState] = useState<"idle" | "syncing" | "done" | "error">("idle");
   const [conflicts, setConflicts] = useState<ConflictFile[]>([]);
@@ -249,15 +241,12 @@ export function App({ namespace }: { namespace: string }) {
   }, []);
 
   const copyMcpCommand = useCallback(() => {
-    const cmd = mcpCommand ?? (isOwnNamespace && patToken
-      ? `claude mcp add emdee --transport http-sse ${window.location.origin}/api/mcp`
-      : null);
-    if (!cmd) return;
-    navigator.clipboard.writeText(cmd).then(() => {
+    if (!mcpCommand) return;
+    navigator.clipboard.writeText(mcpCommand).then(() => {
       setMcpCopied(true);
       setTimeout(() => setMcpCopied(false), 2500);
     });
-  }, [mcpCommand, isOwnNamespace, patToken]);
+  }, [mcpCommand]);
 
   // URL for adding this server as a Claude.ai Custom Connector. The OAuth
   // flow at /oauth/* handles auth on first connect — no token in the URL.
@@ -305,29 +294,6 @@ export function App({ namespace }: { namespace: string }) {
       setResolvingPath(null);
     }
   }, []);
-
-  useEffect(() => {
-    let token = localStorage.getItem("emdee_pat");
-    if (!token) {
-      token = generatePat();
-      localStorage.setItem("emdee_pat", token);
-    }
-    setPatToken(token);
-  }, []);
-
-  const rotatePat = useCallback(() => {
-    const token = generatePat();
-    localStorage.setItem("emdee_pat", token);
-    setPatToken(token);
-  }, []);
-
-  const copyPat = useCallback(() => {
-    if (!patToken) return;
-    navigator.clipboard.writeText(patToken).then(() => {
-      setPatCopied(true);
-      setTimeout(() => setPatCopied(false), 2000);
-    });
-  }, [patToken]);
 
   const toggleCollapsed = useCallback((p: string) => {
     setCollapsed((prev) => {
@@ -579,20 +545,6 @@ export function App({ namespace }: { namespace: string }) {
       <div className="sidebar-wrap" data-open={mobileSidebarOpen}>
         <aside className="sidebar" data-collapsed={sidebarCollapsed}>
           <h1>EMDEE</h1>
-          {isOwnNamespace ? (
-            <div className="pat-section">
-              <span className="pat-label">PAT Token</span>
-              <code className="pat-value">{patToken ? `${patToken.slice(0, 8)}…` : "—"}</code>
-              <div className="pat-actions">
-                <button className="pat-btn" onClick={copyPat} type="button" title="Copy token">
-                  {patCopied ? "✓" : "Copy"}
-                </button>
-                <button className="pat-btn" onClick={rotatePat} type="button" title="Rotate token">
-                  Rotate
-                </button>
-              </div>
-            </div>
-          ) : null}
           {isOwnNamespace && (
             <div className="connect-section">
               <span className="pat-label">Connect to Claude Code</span>
