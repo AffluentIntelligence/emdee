@@ -6,7 +6,7 @@ import { SupabaseStorage } from "@/src/lib/storage/SupabaseStorage";
 import type { ToolContext } from "@/src/lib/mcp/tools/types";
 import {
   listDocs, getSummary, getNeighbors, getDoc, search,
-  appendSection, patchSection, writeDocPreview, writeDoc,
+  appendSection, patchSection, writeDocPreview, writeDoc, deleteDoc,
 } from "@/src/lib/mcp/tools/index";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +64,7 @@ Key conventions:
       { name: "patch_section", description: "Replace the body of an existing H2 section (version-guarded).", inputSchema: { type: "object", properties: { path: { type: "string" }, heading: { type: "string" }, body: { type: "string" }, expected_content_hash: { type: "string" } }, required: ["path", "heading", "body", "expected_content_hash"] } },
       { name: "write_doc_preview", description: "Preview the diff that write_doc would produce.", inputSchema: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } },
       { name: "write_doc", description: "Create or overwrite a markdown doc. DESTRUCTIVE — always run write_doc_preview first.", inputSchema: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } },
+      { name: "delete_doc", description: "Permanently delete a doc. DESTRUCTIVE — no undo. Returns inbound_edges (docs whose wiki-links will dangle) and title_conflicts (duplicate-title siblings). Call get_neighbors first if unsure.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
     ],
   }));
 
@@ -80,6 +81,7 @@ Key conventions:
       case "patch_section":     return await patchSection(ctx, a) as CallToolResult;
       case "write_doc_preview": return await writeDocPreview(ctx, a) as CallToolResult;
       case "write_doc":         return await writeDoc(ctx, a) as CallToolResult;
+      case "delete_doc":        return await deleteDoc(ctx, a) as CallToolResult;
       default: throw new Error(`unknown tool: ${name}`);
     }
   });

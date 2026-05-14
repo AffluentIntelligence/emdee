@@ -7,3 +7,4 @@ export { appendSection } from "./append_section";
 export { patchSection } from "./patch_section";
 export { writeDocPreview } from "./write_doc_preview";
 export { writeDoc } from "./write_doc";
+export { deleteDoc } from "./delete_doc";

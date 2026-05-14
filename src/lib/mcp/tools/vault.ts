@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { buildIndex, buildIndexFromContents, type DocIndex } from "../../../core/indexer";
 import type { ToolContext } from "./types";
@@ -48,4 +48,12 @@ export async function writeVaultFile(ctx: ToolContext, rel: string, content: str
     return;
   }
   await ctx.storage.write(`${ctx.userId}/${rel}`, content);
+}
+
+export async function deleteVaultFile(ctx: ToolContext, rel: string): Promise<void> {
+  if (ctx.mode === "local") {
+    await rm(localSafePath(ctx.docsDir, rel), { force: true });
+    return;
+  }
+  await ctx.storage.delete(`${ctx.userId}/${rel}`);
 }
