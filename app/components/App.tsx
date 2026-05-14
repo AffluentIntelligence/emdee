@@ -374,7 +374,7 @@ export function App({ namespace }: { namespace: string }) {
     loadIndex(false);
   }, [loadIndex]);
 
-  useDocsChanged(useCallback(() => {
+  useDocsChanged(namespace, useCallback(() => {
     if (!localEdit.current) loadIndex(true);
     else localEdit.current = false;
   }, [loadIndex]));
