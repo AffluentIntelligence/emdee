@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { adminClient } from "@/src/lib/supabase/admin";
+import { ensureProfile } from "@/src/lib/supabase/oauth";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,10 @@ export async function POST(request: Request) {
   }
 
   const now = new Date().toISOString();
+  // sync_manifest.clerk_id has a FK to profiles.clerk_id; make sure the row
+  // exists before the upsert (a first-time user may not have one yet).
+  if (ns !== "public") await ensureProfile(ns);
+
   await Promise.all(
     localFiles.map(({ namespacedPath, content }) =>
       storage.write(namespacedPath, content)

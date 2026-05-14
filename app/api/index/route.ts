@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { buildIndexFromContents } from "@/src/core/indexer";
-import { SupabaseStorage } from "@/src/lib/storage/SupabaseStorage";
+import { getVaultStorage } from "@/src/lib/storage";
+import type { VaultStorage } from "@/src/lib/storage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -13,7 +14,7 @@ const NO_STORE = { headers: { "Cache-Control": "no-store" } };
  * the first time an authenticated user opens their own empty workspace, so
  * they see the same intro tree visitors see at `/`.
  */
-async function seedFromPublic(storage: SupabaseStorage, ns: string): Promise<void> {
+async function seedFromPublic(storage: VaultStorage, ns: string): Promise<void> {
   const seeds = await storage.list("public/");
   await Promise.all(
     seeds.map(async (f) => {
@@ -29,17 +30,21 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const ns = url.searchParams.get("ns") ?? "public";
 
+  const { storage, prefix, isLocal } = getVaultStorage(ns);
+
+  // Cloud-mode prerequisites: Supabase credentials must be present.
   if (
-    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-    (!process.env.SUPABASE_SECRET_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY)
+    !isLocal &&
+    (!process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      (!process.env.SUPABASE_SECRET_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY))
   ) {
     return Response.json(EMPTY, NO_STORE);
   }
 
   // Auth gate for personal namespaces. `public` is open; everything else must
-  // be owned by the requester.
+  // be owned by the requester. Local mode is single-tenant — skip the gate.
   let canSeedIfEmpty = false;
-  if (ns !== "public") {
+  if (!isLocal && ns !== "public") {
     const { userId } = await auth();
     if (!userId || userId !== ns) {
       return Response.json(EMPTY, NO_STORE);
@@ -47,16 +52,14 @@ export async function GET(request: Request) {
     canSeedIfEmpty = true;
   }
 
-  const storage = new SupabaseStorage();
-  const prefix = `${ns}/`;
   let listed: Awaited<ReturnType<typeof storage.list>>;
   try {
-    listed = await storage.list(prefix);
+    listed = await storage.list(prefix || undefined);
   } catch {
     listed = [];
   }
 
-  // First-visit seed: copy public/ → {userId}/ once.
+  // First-visit seed: copy public/ → {userId}/ once (cloud only).
   if (listed.length === 0 && canSeedIfEmpty) {
     await seedFromPublic(storage, ns);
     try {
@@ -72,7 +75,7 @@ export async function GET(request: Request) {
 
   const files = await Promise.all(
     listed.map(async (f) => ({
-      path: f.path.slice(prefix.length),
+      path: prefix ? f.path.slice(prefix.length) : f.path,
       content: (await storage.read(f.path)) ?? "",
     }))
   );

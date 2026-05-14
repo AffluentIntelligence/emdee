@@ -29,7 +29,7 @@ function generateCode(): string {
 }
 
 /** Ensure a profiles row exists for this clerk_id so FK-bearing inserts succeed. */
-async function ensureProfile(clerkId: string): Promise<void> {
+export async function ensureProfile(clerkId: string): Promise<void> {
   const { error } = await adminClient()
     .from("profiles")
     .upsert({ clerk_id: clerkId }, { onConflict: "clerk_id", ignoreDuplicates: true });

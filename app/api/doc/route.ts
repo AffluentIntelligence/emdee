@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { SupabaseStorage } from "@/src/lib/storage/SupabaseStorage";
+import { getVaultStorage } from "@/src/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -11,14 +11,15 @@ export async function PUT(request: Request) {
   if (!rel.endsWith(".md")) return new Response("invalid path", { status: 400 });
 
   const body = await request.text();
+  const { storage, prefix, isLocal } = getVaultStorage(ns);
 
-  const { userId } = await auth();
-  if (!userId || userId !== ns) {
-    return new Response("unauthorized", { status: 403 });
+  if (!isLocal) {
+    const { userId } = await auth();
+    if (!userId || userId !== ns) return new Response("unauthorized", { status: 403 });
   }
 
   try {
-    await new SupabaseStorage().write(`${ns}/${rel}`, body);
+    await storage.write(`${prefix}${rel}`, body);
     return new Response(null, { status: 204 });
   } catch (err) {
     return new Response(`save failed: ${(err as Error).message}`, { status: 500 });
@@ -32,11 +33,15 @@ export async function DELETE(request: Request) {
   if (!rel) return new Response("missing path", { status: 400 });
   if (!rel.endsWith(".md")) return new Response("invalid path", { status: 400 });
 
-  const { userId } = await auth();
-  if (!userId || userId !== ns) return new Response("unauthorized", { status: 403 });
+  const { storage, prefix, isLocal } = getVaultStorage(ns);
+
+  if (!isLocal) {
+    const { userId } = await auth();
+    if (!userId || userId !== ns) return new Response("unauthorized", { status: 403 });
+  }
 
   try {
-    await new SupabaseStorage().delete(`${ns}/${rel}`);
+    await storage.delete(`${prefix}${rel}`);
     return new Response(null, { status: 204 });
   } catch (err) {
     return new Response(`delete failed: ${(err as Error).message}`, { status: 500 });
