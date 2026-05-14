@@ -889,6 +889,86 @@ body[data-resizing-split="true"] {
 }
 .graph-bar .btn-danger:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
 
+/* ── Share modal ─────────────────────────────────────────── */
+.share-modal { max-width: 480px; }
+.share-input-wrap { position: relative; }
+.share-input-row { display: flex; gap: 8px; }
+.share-input-row .modal-input { flex: 1; }
+.share-permission {
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+}
+.share-suggestions {
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  max-height: 160px;
+  overflow-y: auto;
+}
+.share-suggestion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.share-suggestion[data-highlight="true"] { background: var(--bg); }
+.share-suggestion-email { color: var(--fg); }
+.share-suggestion-meta { color: var(--muted); font-size: 11px; }
+.share-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 4px 2px;
+}
+.share-hint strong { color: var(--fg); }
+.share-hint-error { color: #ef4444; }
+.share-list {
+  margin: 8px 0 14px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 12px;
+}
+.share-list-title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.share-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+}
+.share-list-info { display: flex; flex-direction: column; gap: 2px; }
+.share-list-email { font-size: 13px; color: var(--fg); }
+.share-list-meta { font-size: 11px; color: var(--muted); }
+.share-revoke { font-size: 12px; padding: 4px 10px; }
+.share-error {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #b91c1c;
+  font-size: 12px;
+}
+.btn-share {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--panel);
+}
+.btn-share:hover { background: var(--accent); color: #fff; }
+
 /* ── Sync (content topbar) ──────────────────────────────── */
 .content-topbar {
   display: flex;

@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { buildIndexFromContents } from "@/src/core/indexer";
 import { getVaultStorage } from "@/src/lib/storage";
 import type { VaultStorage } from "@/src/lib/storage";
+import { ensureProfile } from "@/src/lib/supabase/oauth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -50,6 +51,8 @@ export async function GET(request: Request) {
       return Response.json(EMPTY, NO_STORE);
     }
     canSeedIfEmpty = true;
+    // Backfill email + claim any pending share invitations on first index load.
+    ensureProfile(userId).catch(() => {});
   }
 
   let listed: Awaited<ReturnType<typeof storage.list>>;

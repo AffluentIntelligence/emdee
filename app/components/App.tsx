@@ -1,8 +1,9 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
 import { GraphView } from "./GraphView";
 import { DocEditor } from "./DocEditor";
+import { ShareModal } from "./ShareModal";
 import type { DocIndex, DocNode } from "@/src/core/indexer";
 import { useDocsChanged } from "./useDocsChanged";
 import { useDocLog } from "./useDocLog";
@@ -199,6 +200,7 @@ interface ConflictFile {
 
 export function App({ namespace }: { namespace: string }) {
   const { user, isSignedIn } = useUser();
+  const { signOut } = useClerk();
   const isOwnNamespace = isSignedIn && user?.id === namespace;
   const isPublicNamespace = namespace === "public";
 
@@ -238,6 +240,7 @@ export function App({ namespace }: { namespace: string }) {
   const [assocBusy, setAssocBusy] = useState(false);
   const [deleteCtx, setDeleteCtx] = useState<GraphModalContext | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [shareCtx, setShareCtx] = useState<GraphModalContext | null>(null);
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
   const docLog = useDocLog(namespace);
   const prevContentRef = useRef<Map<string, string>>(new Map());
@@ -463,6 +466,7 @@ export function App({ namespace }: { namespace: string }) {
   // Explicit Docs/Graph buttons (and "Open doc" inside the graph) switch views.
   const selectDoc = useCallback((p: string) => {
     setActivePath(p);
+    setView("main");
     setMobileSidebarOpen(false);
   }, []);
 
@@ -504,6 +508,10 @@ export function App({ namespace }: { namespace: string }) {
 
   const openDeleteNode = useCallback((focalPath: string, focalTitle: string) => {
     setDeleteCtx({ focalPath, focalTitle });
+  }, []);
+
+  const openShareNode = useCallback((focalPath: string, focalTitle: string) => {
+    setShareCtx({ focalPath, focalTitle });
   }, []);
 
   const submitDeleteNode = useCallback(async () => {
@@ -779,7 +787,7 @@ export function App({ namespace }: { namespace: string }) {
           <div className="sidebar-footer">
             <button
               className="sidebar-footer-btn"
-              onClick={() => { setView("log"); setMobileSidebarOpen(false); }}
+              onClick={() => { setView(view === "log" ? "main" : "log"); setMobileSidebarOpen(false); }}
               data-active={view === "log"}
               type="button"
             >
@@ -789,6 +797,20 @@ export function App({ namespace }: { namespace: string }) {
               </svg>
               History
             </button>
+            {isSignedIn && (
+              <button
+                className="sidebar-footer-btn"
+                onClick={() => signOut({ redirectUrl: "/" })}
+                type="button"
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                  <path d="M5 2H2.5C2.22386 2 2 2.22386 2 2.5V10.5C2 10.7761 2.22386 11 2.5 11H5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                  <path d="M8 4L10.5 6.5L8 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10 6.5H5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                </svg>
+                Sign out
+              </button>
+            )}
           </div>
         </aside>
         <button
@@ -817,6 +839,7 @@ export function App({ namespace }: { namespace: string }) {
                   onAddChild={isOwnNamespace ? openAddChild : undefined}
                   onAddAssociation={isOwnNamespace ? openAddAssoc : undefined}
                   onDeleteNode={isOwnNamespace ? openDeleteNode : undefined}
+                  onShareNode={isOwnNamespace ? openShareNode : undefined}
                 />
               )}
             </div>
@@ -1029,6 +1052,15 @@ export function App({ namespace }: { namespace: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share modal */}
+      {shareCtx && (
+        <ShareModal
+          path={shareCtx.focalPath}
+          title={shareCtx.focalTitle}
+          onClose={() => setShareCtx(null)}
+        />
       )}
 
       {/* Conflict resolution modal */}

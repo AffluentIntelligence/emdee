@@ -1,3 +1,4 @@
+import { clerkClient } from "@clerk/nextjs/server";
 import { adminClient, hashToken } from "./admin";
 
 const TOKEN_TTL_DAYS = 30;
@@ -28,12 +29,74 @@ function generateCode(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Ensure a profiles row exists for this clerk_id so FK-bearing inserts succeed. */
+async function fetchClerkEmail(clerkId: string): Promise<string | null> {
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(clerkId);
+    const primary = user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId);
+    return primary?.emailAddress ?? user.emailAddresses[0]?.emailAddress ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * When a profile gets an email for the first time, look up any pending
+ * share_invitations addressed to that email and convert them into doc_shares
+ * (then mark the invitations accepted). This is what makes "invite by email
+ * before signup" actually deliver access once the invitee joins.
+ */
+async function claimPendingInvitations(clerkId: string, email: string): Promise<void> {
+  const admin = adminClient();
+  const { data: invites } = await admin
+    .from("share_invitations")
+    .select("id, inviter_id, path_prefix, permission")
+    .eq("status", "pending")
+    .ilike("invitee_email", email);
+  if (!invites || invites.length === 0) return;
+
+  const rows = invites.map((inv) => ({
+    owner_id: inv.inviter_id,
+    grantee_id: clerkId,
+    path_prefix: inv.path_prefix,
+    permission: inv.permission,
+  }));
+  await admin.from("doc_shares").upsert(rows, {
+    onConflict: "owner_id,path_prefix,grantee_id",
+    ignoreDuplicates: true,
+  });
+  await admin
+    .from("share_invitations")
+    .update({ status: "accepted", accepted_at: new Date().toISOString() })
+    .in("id", invites.map((i) => i.id));
+}
+
+/**
+ * Ensure a profiles row exists for this clerk_id so FK-bearing inserts succeed.
+ * Also backfills email from Clerk if the existing row has none — needed for
+ * email-based sharing lookups — and claims any pending share invitations
+ * addressed to that email.
+ */
 export async function ensureProfile(clerkId: string): Promise<void> {
-  const { error } = await adminClient()
+  const admin = adminClient();
+  const { data: existing } = await admin
     .from("profiles")
-    .upsert({ clerk_id: clerkId }, { onConflict: "clerk_id", ignoreDuplicates: true });
+    .select("clerk_id, email")
+    .eq("clerk_id", clerkId)
+    .maybeSingle();
+
+  if (existing?.email) return;
+
+  const email = await fetchClerkEmail(clerkId);
+  const row: { clerk_id: string; email?: string } = { clerk_id: clerkId };
+  if (email) row.email = email;
+
+  const { error } = await admin
+    .from("profiles")
+    .upsert(row, { onConflict: "clerk_id" });
   if (error) throw new Error(`failed to ensure profile: ${error.message}`);
+
+  if (email) await claimPendingInvitations(clerkId, email);
 }
 
 export async function storeAuthCode(params: {
