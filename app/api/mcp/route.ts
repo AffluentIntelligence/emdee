@@ -6,7 +6,7 @@ import { SupabaseStorage } from "@/src/lib/storage/SupabaseStorage";
 import type { ToolContext } from "@/src/lib/mcp/tools/types";
 import {
   listDocs, getSummary, getNeighbors, getDoc, search,
-  appendSection, patchSection, writeDocPreview, writeDoc, deleteDoc, splitDoc, renameDoc, patchPreamble,
+  appendSection, patchSection, writeDocPreview, writeDoc, deleteDoc, splitDoc, renameDoc, patchPreamble, appendDoc,
 } from "@/src/lib/mcp/tools/index";
 
 export const dynamic = "force-dynamic";
@@ -67,7 +67,8 @@ Shared docs:
       { name: "get_neighbors", description: "Return the doc plus its 1-hop neighborhood.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "get_doc", description: "Return full markdown content of one doc plus sections with content_hash.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "search", description: "Case-insensitive search over titles, summaries, and content.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] } },
-      { name: "append_section", description: "Append markdown content to an existing H2 section.", inputSchema: { type: "object", properties: { path: { type: "string" }, heading: { type: "string" }, body: { type: "string" }, create_if_missing: { type: "boolean" } }, required: ["path", "heading", "body"] } },
+      { name: "append_section", description: "Append markdown content to the END of an existing H2 section's body. NOTE: when the section isn't the doc's last, this lands mid-doc. For chronological note-taking that should always land at the bottom of the page, use append_doc instead.", inputSchema: { type: "object", properties: { path: { type: "string" }, heading: { type: "string" }, body: { type: "string" }, create_if_missing: { type: "boolean" } }, required: ["path", "heading", "body"] } },
+      { name: "append_doc", description: "Append content to the very end of a doc (after every existing section). For chronological note-taking — LOGS, daily notes, anywhere new content should land at the bottom of the page regardless of section structure. The body may include its own `##` headings to introduce new sections at the end.", inputSchema: { type: "object", properties: { path: { type: "string" }, body: { type: "string" } }, required: ["path", "body"] } },
       { name: "patch_section", description: "Replace the body of an existing H2 section (version-guarded).", inputSchema: { type: "object", properties: { path: { type: "string" }, heading: { type: "string" }, body: { type: "string" }, expected_content_hash: { type: "string" } }, required: ["path", "heading", "body", "expected_content_hash"] } },
       { name: "write_doc_preview", description: "Preview the diff that write_doc would produce.", inputSchema: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } },
       { name: "write_doc", description: "Create or overwrite a markdown doc. DESTRUCTIVE — always run write_doc_preview first.", inputSchema: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"] } },
@@ -95,6 +96,7 @@ Shared docs:
       case "split_doc":         return await splitDoc(ctx, a) as CallToolResult;
       case "rename_doc":        return await renameDoc(ctx, a) as CallToolResult;
       case "patch_preamble":    return await patchPreamble(ctx, a) as CallToolResult;
+      case "append_doc":        return await appendDoc(ctx, a) as CallToolResult;
       default: throw new Error(`unknown tool: ${name}`);
     }
   });
