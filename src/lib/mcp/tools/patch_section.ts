@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { validatePath, readVaultFile, writeVaultFile } from "./vault";
+import { lintDocContent } from "./lint";
 import type { ToolContext } from "./types";
 
 function json(value: unknown) {
@@ -75,5 +76,9 @@ export async function patchSection(ctx: ToolContext, args: Record<string, unknow
     ...lines.slice(target.bodyEndLineIdx),
   ].join("\n");
   await writeVaultFile(ctx, rel, newContent);
-  return json({ ok: true, content_hash: hashBody(body.trim()) });
+
+  const lint = lintDocContent(newContent);
+  const payload: Record<string, unknown> = { ok: true, content_hash: hashBody(body.trim()) };
+  if (lint.warnings.length > 0) payload.warnings = lint.warnings;
+  return json(payload);
 }
