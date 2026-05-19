@@ -52,6 +52,12 @@ Key conventions:
 - Every doc starts with one H1 + one > blockquote summary immediately below it.
 - Sprints: Child of [[PROJECT — BUILD]] if active/spec, Child of [[PROJECT — LOGS]] if shipped.
 
+Edge discipline (lint_doc warns on violations):
+- One parent per doc: \`## Child of\` should have exactly one bullet. Multiple parents → demote the secondary ones to \`## Associated with\`.
+- No sibling associations: docs that share a parent are already related through it. \`## Associated with\` is for cross-tree connections (project↔person, sprint↔learning), not for linking two day-notes under the same event.
+- Reciprocal edges: if A's \`## Parent of\` lists [[B]], B's \`## Child of\` must list [[A]]. One-sided edges fire asymmetric_parent_edge / asymmetric_child_edge.
+- Sibling order is derived from the parent's \`## Parent of\` bullet order — never declare \`[[next-node]]\` / \`[[prev-node]]\` edges in markdown. \`get_neighbors\` returns \`prev_sibling\` / \`next_sibling\` automatically.
+
 Shared docs:
 - Paths starting with "__shared__/<owner_id>/" are docs another user has
   shared into this vault. They appear in list_docs and are readable via
