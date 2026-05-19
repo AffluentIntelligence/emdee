@@ -19,21 +19,24 @@ export interface Props {
   nextSibling?: DocNode | null;
 }
 
-// 8 angular slots around the focal at 45° each, starting at 12 o'clock.
+// 8 angular slots around the focal at 45° each, numbered ANTICLOCKWISE
+// from 12 o'clock. The numbering mirrors the navigation: slot 1 is "back"
+// (prev sibling, smaller index), slot 7 is "forward" (next sibling,
+// larger index), and the rotatable middle 2…6 reads as "child 1 through
+// child 5" in the same anticlockwise direction.
 //
 // Lineage slots — reserved, never backfilled with children/associates:
-//   slot 0 (12)   = parent
-//   slot 1 (1:30) = next sibling
-//   slot 7 (10:30)= prev sibling
+//   slot 0 (12)    = parent
+//   slot 1 (10:30) = prev sibling
+//   slot 7 (1:30)  = next sibling
 //
-// Rotatable slots — focal's children/associates, ordered anticlockwise
-// from 9 o'clock (1st) to 3 o'clock (5th), filling the bottom half of
-// the ring. Fixed page size of 5 — paginate when focal has more.
+// Rotatable slots — focal's children/associates. 1st node at 9 o'clock
+// (slot 2), 5th at 3 o'clock (slot 6). Fixed page size of 5.
 const SLOT_COUNT = 8;
 const PARENT_SLOT = 0;
-const NEXT_SIBLING_SLOT = 1;
-const PREV_SIBLING_SLOT = 7;
-const ROTATABLE_SLOTS = [6, 5, 4, 3, 2];
+const PREV_SIBLING_SLOT = 1;
+const NEXT_SIBLING_SLOT = 7;
+const ROTATABLE_SLOTS = [2, 3, 4, 5, 6];
 const PAGE_SIZE = ROTATABLE_SLOTS.length;
 const LAYER2_PER_LAYER1 = 2;
 const RADIUS_LAYER1 = 240;
@@ -169,7 +172,10 @@ function neighborsOf(index: DocIndex, focal: string): Neighbor[] {
 }
 
 function angleForSlot(slot: number): number {
-  return (slot / SLOT_COUNT) * Math.PI * 2 - Math.PI / 2;
+  // Anticlockwise on the visible clock face. Slot 0 at 12, slot 1 at 10:30,
+  // slot 2 at 9, …, slot 7 at 1:30. (Math y-axis flipped on screen, so the
+  // formula negates the slot fraction to walk CCW visually.)
+  return -Math.PI / 2 - (slot / SLOT_COUNT) * Math.PI * 2;
 }
 
 // Walk the focal's first declared parent to find prev/next siblings in
