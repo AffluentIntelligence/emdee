@@ -1434,3 +1434,182 @@ body[data-resizing-split="true"] {
 }
 .btn-sibling-nav:hover:not(:disabled) { background: var(--bg); border-color: var(--accent); color: var(--accent); }
 .btn-sibling-nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ------------------------------------------------------------------ */
+/* Public-share view — /share/<handle>/<slug>. Standalone layout that
+   reuses GraphView + DocEditor but skips the App shell's sidebar tree,
+   edit toolbar, and save pipeline. Sized to the viewport with a flex
+   column: header + body (sidebar / graph / doc). */
+.public-share-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+.public-share-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.public-share-title { font-size: 14px; color: var(--muted); }
+.public-share-handle { color: var(--fg); font-weight: 600; }
+.public-share-sep { margin: 0 6px; }
+.public-share-slug { color: var(--fg); font-weight: 500; }
+.public-share-cta {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.public-share-cta:hover { filter: brightness(1.08); }
+
+.public-share-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.public-share-sidebar {
+  width: 280px;
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+.public-share-card h2 { margin: 0 0 12px; font-size: 22px; letter-spacing: 0.04em; }
+.public-share-card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 10px; }
+.public-share-cta-strong {
+  display: block;
+  width: 100%;
+  margin: 14px 0 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.public-share-cta-strong:hover { filter: brightness(1.08); }
+.public-share-card-foot { font-size: 11.5px; color: var(--muted); }
+
+.public-share-main {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+.public-share-graph {
+  flex: 1.2;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  position: relative;
+}
+.public-share-doc {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+.public-share-doc-title {
+  padding: 14px 18px 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+.public-share-doc-host { flex: 1; min-height: 0; }
+.public-share-doc-host .toastui-editor-defaultUI { border: none; }
+.public-share-doc-host .toastui-editor-defaultUI-toolbar { display: none; }
+.public-share-empty {
+  padding: 32px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Narrow stage: collapse sidebar below the main area. */
+@media (max-width: 900px) {
+  .public-share-body { flex-direction: column; }
+  .public-share-sidebar { width: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .public-share-main { flex-direction: column; }
+  .public-share-graph { border-right: none; border-bottom: 1px solid var(--border); height: 50vh; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Publish modal — owner-side. Lives in the graph view's action bar.
+   Modal stays simple for tonight: slug + two toggles, no tree picker. */
+.publish-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.publish-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  min-width: 380px;
+  max-width: 92vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  font-size: 13px;
+}
+.publish-modal h2 { margin: 0 0 4px; font-size: 16px; }
+.publish-modal p { color: var(--muted); margin: 0 0 14px; font-size: 12.5px; }
+.publish-modal label { display: block; margin-bottom: 12px; }
+.publish-modal label > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.publish-modal input[type="text"] {
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+}
+.publish-modal-toggles { margin: 8px 0 16px; }
+.publish-modal-toggles label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--fg);
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+.publish-modal-result {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12.5px;
+  word-break: break-all;
+}
+.publish-modal-result a { color: var(--accent); text-decoration: none; }
+.publish-modal-result a:hover { text-decoration: underline; }
+.publish-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.publish-modal-actions button {
+  padding: 7px 14px; font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.publish-modal-actions button.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.publish-modal-actions button.primary:disabled { opacity: 0.5; cursor: not-allowed; }

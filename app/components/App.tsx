@@ -4,6 +4,7 @@ import { useClerk, useUser } from "@clerk/nextjs";
 import { GraphView } from "./GraphView";
 import { DocEditor } from "./DocEditor";
 import { ShareModal } from "./ShareModal";
+import { PublishModal } from "./PublishModal";
 import type { DocIndex, DocNode } from "@/src/core/indexer";
 import { getPrevNextSiblings } from "@/src/core/siblings";
 import { useDocsChanged } from "./useDocsChanged";
@@ -284,6 +285,7 @@ export function App({ namespace }: { namespace: string }) {
   const [deleteCtx, setDeleteCtx] = useState<GraphModalContext | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [shareCtx, setShareCtx] = useState<GraphModalContext | null>(null);
+  const [publishCtx, setPublishCtx] = useState<GraphModalContext | null>(null);
   const [sharedDocs, setSharedDocs] = useState<SharedDoc[]>([]);
   const [renameCtx, setRenameCtx] = useState<GraphModalContext | null>(null);
   const [renameTitle, setRenameTitle] = useState("");
@@ -709,6 +711,10 @@ export function App({ namespace }: { namespace: string }) {
     setShareCtx({ focalPath, focalTitle });
   }, []);
 
+  const openPublishNode = useCallback((focalPath: string, focalTitle: string) => {
+    setPublishCtx({ focalPath, focalTitle });
+  }, []);
+
   const openRenameNode = useCallback((focalPath: string, focalTitle: string) => {
     setRenameCtx({ focalPath, focalTitle });
     setRenameTitle(focalTitle);
@@ -1109,6 +1115,7 @@ export function App({ namespace }: { namespace: string }) {
                   onAddAssociation={isOwnNamespace ? openAddAssoc : undefined}
                   onDeleteNode={isOwnNamespace ? openDeleteNode : undefined}
                   onShareNode={isOwnNamespace ? openShareNode : undefined}
+                  onPublishNode={isOwnNamespace ? openPublishNode : undefined}
                   onRenameNode={isOwnNamespace ? openRenameNode : undefined}
                   prevSibling={prevSibling}
                   nextSibling={nextSibling}
@@ -1418,6 +1425,15 @@ export function App({ namespace }: { namespace: string }) {
           path={shareCtx.focalPath}
           title={shareCtx.focalTitle}
           onClose={() => { setShareCtx(null); refreshShared(); }}
+        />
+      )}
+
+      {/* Publish modal — owner-only public share */}
+      {publishCtx && (
+        <PublishModal
+          focalPath={publishCtx.focalPath}
+          focalTitle={publishCtx.focalTitle}
+          onClose={() => setPublishCtx(null)}
         />
       )}
 
