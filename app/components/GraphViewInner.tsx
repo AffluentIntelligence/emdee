@@ -19,13 +19,23 @@ export interface Props {
   nextSibling?: DocNode | null;
 }
 
-const PAGE_SIZE = 8;
+// 8 angular slots around the focal at 45° each, starting at 12 o'clock.
+// Slot 0 (12) is reserved for the parent when one exists. Slots 2 (3 o'clock)
+// and 6 (9 o'clock) are reserved for the next and previous siblings — the
+// fixed positions are what makes the prev/next-sibling navigation feel like
+// a rotation: when you click Next, the node at slot 2 becomes the focal and
+// the old focal lands at slot 6 (which is the new focal's prev sibling
+// position), so cytoscape's tween between layouts visually spins the ring.
+const SLOT_COUNT = 8;
+const PARENT_SLOT = 0;
+const NEXT_SIBLING_SLOT = 2;
+const PREV_SIBLING_SLOT = 6;
 const LAYER2_PER_LAYER1 = 2;
 const RADIUS_LAYER1 = 240;
 const RADIUS_LAYER2 = 400;
 const ANIM_MS = 500;
 
-type Role = "parent" | "child" | "assoc";
+type Role = "parent" | "child" | "assoc" | "sibling";
 
 type Category =
   | "emdee"
@@ -65,6 +75,7 @@ const ROLE_LABEL: Record<Role, string> = {
   parent: "Child of",
   child: "Parent of",
   assoc: "Associated",
+  sibling: "",
 };
 
 // Category palette. Base = node border + assoc edges. Hier = hierarchy edges
@@ -143,17 +154,48 @@ function neighborsOf(index: DocIndex, focal: string): Neighbor[] {
   // when docs live in subfolders like `sample/`.
   const titleFor = (p: string) => index.docs.find((d) => d.path === p)?.title ?? p;
   return [...seen.values()].sort((a, b) => {
-    const order: Record<Role, number> = { parent: 0, child: 1, assoc: 2 };
+    const order: Record<Role, number> = { parent: 0, child: 1, assoc: 2, sibling: 3 };
     if (order[a.role] !== order[b.role]) return order[a.role] - order[b.role];
     return titleFor(a.id).localeCompare(titleFor(b.id));
   });
+}
+
+function angleForSlot(slot: number): number {
+  return (slot / SLOT_COUNT) * Math.PI * 2 - Math.PI / 2;
+}
+
+// Walk the focal's first declared parent to find prev/next siblings in
+// declared order. Same derivation as App's prevSibling/nextSibling memo
+// and the get_neighbors MCP tool — the parent's `## Parent of` bullet
+// order is the single source of truth for sibling sequencing.
+function getPrevNextSiblings(index: DocIndex, focalId: string): {
+  prevPath: string | null;
+  nextPath: string | null;
+} {
+  const focalDoc = index.docs.find((d) => d.path === focalId);
+  if (!focalDoc) return { prevPath: null, nextPath: null };
+  const primaryParent = focalDoc.parents[0];
+  if (!primaryParent) return { prevPath: null, nextPath: null };
+  const byTitle = new Map<string, typeof index.docs[number]>();
+  for (const d of index.docs) byTitle.set(d.title.toLowerCase(), d);
+  const parentDoc = byTitle.get(primaryParent.title.toLowerCase());
+  if (!parentDoc) return { prevPath: null, nextPath: null };
+  const siblingPaths = parentDoc.children
+    .map((l) => byTitle.get(l.title.toLowerCase())?.path)
+    .filter((p): p is string => !!p);
+  const idx = siblingPaths.findIndex((p) => p === focalId);
+  if (idx === -1) return { prevPath: null, nextPath: null };
+  return {
+    prevPath: siblingPaths[idx - 1] ?? null,
+    nextPath: siblingPaths[idx + 1] ?? null,
+  };
 }
 
 function placeLayout(
   index: DocIndex,
   focalId: string,
   page: number
-): { nodes: PlacedNode[]; edges: PlacedEdge[]; totalLayer1: number } {
+): { nodes: PlacedNode[]; edges: PlacedEdge[]; totalRotatable: number; pageSize: number } {
   const titleFor = (p: string) => index.docs.find((d) => d.path === p)?.title ?? p;
   const focalTitle = titleFor(focalId);
   // Strip a parent's title prefix from a child label, including any
@@ -172,17 +214,41 @@ function placeLayout(
   };
   const shortLabel = (p: string) => shortLabelForParent(focalTitle, p);
 
-  const allLayer1 = neighborsOf(index, focalId);
-  const totalLayer1 = allLayer1.length;
-  const start = page * PAGE_SIZE;
-  const layer1 = allLayer1.slice(start, start + PAGE_SIZE);
+  const all = neighborsOf(index, focalId);
+  const parent = all.find((n) => n.role === "parent") ?? null;
+  // Rotatable = children + associates. Siblings are 2-hop and aren't in `all`
+  // (no direct edge focal↔sibling), so no exclusion needed here.
+  const rotatable = all.filter((n) => n.role !== "parent");
+
+  const { prevPath, nextPath } = getPrevNextSiblings(index, focalId);
+  // Sibling slots only get filled if the sibling actually exists as a doc.
+  const nextSiblingId =
+    nextPath && index.docs.some((d) => d.path === nextPath) ? nextPath : null;
+  const prevSiblingId =
+    prevPath && index.docs.some((d) => d.path === prevPath) ? prevPath : null;
+
+  // Reserved slots collapse the available pool for rotatable neighbors.
+  const reservedSlots = new Set<number>();
+  if (parent) reservedSlots.add(PARENT_SLOT);
+  if (nextSiblingId) reservedSlots.add(NEXT_SIBLING_SLOT);
+  if (prevSiblingId) reservedSlots.add(PREV_SIBLING_SLOT);
+  const availableSlots: number[] = [];
+  for (let i = 0; i < SLOT_COUNT; i++) {
+    if (!reservedSlots.has(i)) availableSlots.push(i);
+  }
+
+  const pageSize = Math.max(1, availableSlots.length);
+  const totalRotatable = rotatable.length;
+  const totalPages = Math.max(1, Math.ceil(totalRotatable / pageSize));
+  const safePage = ((page % totalPages) + totalPages) % totalPages;
+  const pageStart = safePage * pageSize;
+  const onPage = rotatable.slice(pageStart, pageStart + pageSize);
 
   // Strip the parent prefix from the focal label too — "POKEAI — LOGS"
   // under parent POKEAI reads as just "LOGS". Picks the first declared
   // parent's title; if there's no parent we fall back to the full title.
-  const focalParent = allLayer1.find((n) => n.role === "parent");
-  const focalLabel = focalParent
-    ? shortLabelForParent(titleFor(focalParent.id), focalId)
+  const focalLabel = parent
+    ? shortLabelForParent(titleFor(parent.id), focalId)
     : titleFor(focalId);
 
   const placed = new Map<string, PlacedNode>();
@@ -195,8 +261,55 @@ function placeLayout(
   });
 
   const layer1AnglesById = new Map<string, number>();
-  layer1.forEach((n, i) => {
-    const angle = (i / Math.max(layer1.length, 1)) * Math.PI * 2 - Math.PI / 2;
+  const layer1Real: Neighbor[] = []; // parent + on-page rotatable; siblings excluded
+
+  // Place parent at slot 0 (always 12 o'clock when present)
+  if (parent) {
+    const angle = angleForSlot(PARENT_SLOT);
+    layer1AnglesById.set(parent.id, angle);
+    placed.set(parent.id, {
+      id: parent.id,
+      label: shortLabel(parent.id),
+      kind: "layer1",
+      category: categoryFor(parent.id),
+      position: { x: Math.cos(angle) * RADIUS_LAYER1, y: Math.sin(angle) * RADIUS_LAYER1 },
+    });
+    layer1Real.push(parent);
+  }
+
+  // Place next sibling at slot 2 (3 o'clock) — no direct edge from focal,
+  // because the relationship is focal↔parent↔sibling. Rendered as a
+  // floating layer-1 node so it can rotate into focus on click.
+  if (nextSiblingId) {
+    const angle = angleForSlot(NEXT_SIBLING_SLOT);
+    layer1AnglesById.set(nextSiblingId, angle);
+    placed.set(nextSiblingId, {
+      id: nextSiblingId,
+      label: shortLabel(nextSiblingId),
+      kind: "layer1",
+      category: categoryFor(nextSiblingId),
+      position: { x: Math.cos(angle) * RADIUS_LAYER1, y: Math.sin(angle) * RADIUS_LAYER1 },
+    });
+  }
+
+  // Place prev sibling at slot 6 (9 o'clock)
+  if (prevSiblingId) {
+    const angle = angleForSlot(PREV_SIBLING_SLOT);
+    layer1AnglesById.set(prevSiblingId, angle);
+    placed.set(prevSiblingId, {
+      id: prevSiblingId,
+      label: shortLabel(prevSiblingId),
+      kind: "layer1",
+      category: categoryFor(prevSiblingId),
+      position: { x: Math.cos(angle) * RADIUS_LAYER1, y: Math.sin(angle) * RADIUS_LAYER1 },
+    });
+  }
+
+  // Place rotatable neighbors in the remaining slots, in their sorted order
+  onPage.forEach((n, i) => {
+    const slot = availableSlots[i];
+    if (slot === undefined) return; // ran out of slots (shouldn't happen with the cap)
+    const angle = angleForSlot(slot);
     layer1AnglesById.set(n.id, angle);
     placed.set(n.id, {
       id: n.id,
@@ -205,13 +318,17 @@ function placeLayout(
       category: categoryFor(n.id),
       position: { x: Math.cos(angle) * RADIUS_LAYER1, y: Math.sin(angle) * RADIUS_LAYER1 },
     });
+    layer1Real.push(n);
   });
 
-  const reservedIds = new Set<string>([focalId, ...layer1.map((n) => n.id)]);
+  const reservedIds = new Set<string>([focalId]);
+  for (const n of layer1Real) reservedIds.add(n.id);
+  if (nextSiblingId) reservedIds.add(nextSiblingId);
+  if (prevSiblingId) reservedIds.add(prevSiblingId);
   const edges: PlacedEdge[] = [];
   const layer2Pairs: { layer1Id: string; neighbor: Neighbor }[] = [];
 
-  for (const l1 of layer1) {
+  for (const l1 of layer1Real) {
     edges.push({
       id: `e:${focalId}|${l1.id}`,
       source: l1.role === "parent" ? l1.id : focalId,
@@ -289,7 +406,7 @@ function placeLayout(
     });
   }
 
-  return { nodes: [...placed.values()], edges, totalLayer1 };
+  return { nodes: [...placed.values()], edges, totalRotatable, pageSize };
 }
 
 function syncGraph(
@@ -599,9 +716,9 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
   }, [layout]);
 
   const focalDoc = focalId ? index.docs.find((d) => d.path === focalId) ?? null : null;
-  const totalLayer1 = layout?.totalLayer1 ?? 0;
-  const totalPages = Math.max(1, Math.ceil(totalLayer1 / PAGE_SIZE));
-  const pageStart = page * PAGE_SIZE;
+  const totalRotatable = layout?.totalRotatable ?? 0;
+  const layoutPageSize = layout?.pageSize ?? SLOT_COUNT;
+  const totalPages = Math.max(1, Math.ceil(totalRotatable / layoutPageSize));
 
   // Lineage path from a root ancestor down to the focal. Walks parent
   // hierarchy edges (kind === "hierarchy", to === current) one step at
@@ -744,10 +861,10 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
               type="button"
             >‹ Prev Page</button>
             <span className="graph-controls-page">
-              {totalLayer1 === 0
+              {totalRotatable === 0
                 ? "No connections"
                 : totalPages === 1
-                ? `${totalLayer1} connection${totalLayer1 === 1 ? "" : "s"}`
+                ? `${totalRotatable} connection${totalRotatable === 1 ? "" : "s"}`
                 : `Page ${page + 1} / ${totalPages}`}
             </span>
             <button
