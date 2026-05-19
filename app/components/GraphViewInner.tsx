@@ -53,7 +53,9 @@ type Category =
   | "vault"
   | "projects"
   | "people"
-  | "hackathons"
+  | "events"
+  | "novels"
+  | "info"
   | "education"
   | "career"
   | "default";
@@ -98,16 +100,19 @@ const ROLE_LABEL: Record<Role, string> = {
 
 // Category palette. Base = node border + assoc edges. Hier = hierarchy edges
 // (darker variant of base). Fill = soft tint for node interior so labels stay
-// readable. Picked from Tailwind 500/600/100 ramps; reasonably colorblind-safe.
+// readable. Picked from Tailwind 500/600/100 ramps with each family hue
+// roughly 40°+ apart for distinguishability under common color vision.
 const CATEGORY_BASE: Record<Category, string> = {
-  emdee: "#4f46e5",
-  vault: "#64748b",
-  projects: "#3b82f6",
-  people: "#10b981",
-  hackathons: "#f59e0b",
-  education: "#8b5cf6",
-  career: "#06b6d4",
-  default: "#9ca3af",
+  emdee: "#4f46e5",       // indigo — the root itself
+  vault: "#64748b",       // slate — meta/spec
+  projects: "#3b82f6",    // blue
+  people: "#10b981",      // emerald
+  events: "#f59e0b",      // amber
+  novels: "#f43f5e",      // rose
+  info: "#14b8a6",        // teal
+  education: "#8b5cf6",   // violet
+  career: "#06b6d4",      // cyan
+  default: "#9ca3af",     // neutral gray
 };
 
 const CATEGORY_HIER: Record<Category, string> = {
@@ -115,7 +120,9 @@ const CATEGORY_HIER: Record<Category, string> = {
   vault: "#475569",
   projects: "#2563eb",
   people: "#059669",
-  hackathons: "#d97706",
+  events: "#d97706",
+  novels: "#e11d48",
+  info: "#0d9488",
   education: "#7c3aed",
   career: "#0891b2",
   default: "#6b7280",
@@ -126,7 +133,9 @@ const CATEGORY_FILL: Record<Category, string> = {
   vault: "#e2e8f0",
   projects: "#dbeafe",
   people: "#d1fae5",
-  hackathons: "#fef3c7",
+  events: "#fef3c7",
+  novels: "#ffe4e6",
+  info: "#ccfbf1",
   education: "#ede9fe",
   career: "#cffafe",
   default: "#f3f4f6",
@@ -137,21 +146,30 @@ const CATEGORY_FILL: Record<Category, string> = {
 function categoryFor(rawPath: string): Category {
   const p = rawPath.toLowerCase();
   if (p === "emdee.md") return "emdee";
+  if (p === "vault.md") return "vault";
+  if (p === "projects.md" || p.startsWith("projects/")) return "projects";
+  if (p === "people.md" || p.startsWith("people/")) return "people";
+  if (p === "events.md" || p.startsWith("events/")) return "events";
+  if (p === "novels.md" || p.startsWith("novels/")) return "novels";
+  if (p === "education.md" || p.startsWith("education/")) return "education";
+  if (p === "career.md" || p.startsWith("career/")) return "career";
   if (
-    p === "vault.md" ||
     p === "info.md" ||
     p === "instructions.md" ||
     p === "brain.md" ||
     p === "workflows.md" ||
-    p === "sample.md"
-  )
-    return "vault";
-  if (p.startsWith("sample/") || p.startsWith("workflows/")) return "vault";
-  if (p === "projects.md" || p.startsWith("projects/")) return "projects";
-  if (p === "people.md" || p.startsWith("people/")) return "people";
-  if (p === "hackathons.md" || p.startsWith("hackathons/")) return "hackathons";
-  if (p === "education.md" || p.startsWith("education/")) return "education";
-  if (p === "career.md" || p.startsWith("career/")) return "career";
+    p === "sample.md" ||
+    p.startsWith("info/") ||
+    p.startsWith("instructions/") ||
+    p.startsWith("brain/") ||
+    p.startsWith("workflows/") ||
+    p.startsWith("sample/")
+  ) {
+    return "info";
+  }
+  // Legacy: a top-level hackathons.md or hackathons/ folder maps to events
+  // since the vault now nests hackathons under events.
+  if (p === "hackathons.md" || p.startsWith("hackathons/")) return "events";
   return "default";
 }
 
