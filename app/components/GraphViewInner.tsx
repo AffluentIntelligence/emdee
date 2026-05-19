@@ -83,6 +83,10 @@ interface PlacedEdge {
   role: Role;
   targetCategory: Category;
   showLabel: boolean;
+  // Background associations span non-focal pairs (e.g., a layer-2 node
+  // associates with another layer-2 node). They render behind everything
+  // else so they hint at the cross-tree connection without dominating.
+  background?: boolean;
 }
 
 const ROLE_LABEL: Record<Role, string> = {
@@ -376,6 +380,25 @@ function placeLayout(
     }
   }
 
+  // Siblings also get layer-2 sprouts so they read as real, navigable
+  // nodes — when the user rotates to a sibling, its children are already
+  // visible as a preview. Sprouts go in the "child" direction (downward
+  // toward the leaves), same as for the focal's own children.
+  for (const siblingId of [nextSiblingId, prevSiblingId]) {
+    if (!siblingId) continue;
+    const candidates = neighborsOf(index, siblingId)
+      .filter((n) => !reservedIds.has(n.id))
+      .filter((n) => n.role === "child");
+    let added = 0;
+    for (const cand of candidates) {
+      if (added >= LAYER2_PER_LAYER1) break;
+      if (placed.has(cand.id)) continue;
+      reservedIds.add(cand.id);
+      layer2Pairs.push({ layer1Id: siblingId, neighbor: cand });
+      added++;
+    }
+  }
+
   // Place layer-2 around their parent layer-1 angle
   const offsetSpread = Math.PI / 13; // ~14° between the two layer-2 sprouts
   const groupedByL1 = new Map<string, Neighbor[]>();
@@ -414,6 +437,47 @@ function placeLayout(
         showLabel: false,
       });
     });
+  }
+
+  // Cross-tree association overlay. Scan every pair of visible nodes that
+  // didn't already get an edge from the focal's own neighborhood, and add
+  // a `background: true` assoc edge whenever either side declares the
+  // other in `## Associated with`. The renderer draws these as curved
+  // lines behind everything else — they surface relationships like
+  // "CODY (under PEOPLE) associates with DOUBLELEAD (under PROJECTS)"
+  // without having to navigate into CODY's view.
+  const docsByPath = new Map<string, DocNode>();
+  const byTitle = new Map<string, DocNode>();
+  for (const d of index.docs) {
+    docsByPath.set(d.path, d);
+    byTitle.set(d.title.toLowerCase(), d);
+  }
+  const drawnAssocPairs = new Set<string>();
+  const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  for (const e of edges) {
+    if (e.kind === "assoc") drawnAssocPairs.add(pairKey(e.source, e.target));
+  }
+  const visibleIds = [...placed.keys()];
+  for (const nodeId of visibleIds) {
+    const doc = docsByPath.get(nodeId);
+    if (!doc) continue;
+    for (const link of doc.associates) {
+      const target = byTitle.get(link.title.toLowerCase());
+      if (!target || !placed.has(target.path) || target.path === nodeId) continue;
+      const key = pairKey(nodeId, target.path);
+      if (drawnAssocPairs.has(key)) continue;
+      drawnAssocPairs.add(key);
+      edges.push({
+        id: `e:assoc-bg:${nodeId}|${target.path}`,
+        source: nodeId,
+        target: target.path,
+        kind: "assoc",
+        role: "assoc",
+        targetCategory: categoryFor(target.path),
+        showLabel: false,
+        background: true,
+      });
+    }
   }
 
   return { nodes: [...placed.values()], edges, totalRotatable, pageSize };
@@ -494,18 +558,20 @@ function syncGraph(
 
   // Add fresh edges
   for (const ed of layout.edges) {
-    cy.add({
-      group: "edges",
-      data: {
-        id: ed.id,
-        source: ed.source,
-        target: ed.target,
-        kind: ed.kind,
-        role: ed.role,
-        targetCategory: ed.targetCategory,
-        label: ed.showLabel ? ROLE_LABEL[ed.role] : "",
-      },
-    });
+    const data: Record<string, unknown> = {
+      id: ed.id,
+      source: ed.source,
+      target: ed.target,
+      kind: ed.kind,
+      role: ed.role,
+      targetCategory: ed.targetCategory,
+      label: ed.showLabel ? ROLE_LABEL[ed.role] : "",
+    };
+    // Only set the `background` data key when truthy so the cytoscape
+    // selector `edge[background]` matches presence-only (avoids false
+    // positives from `background: false` cluttering the data).
+    if (ed.background) data.background = true;
+    cy.add({ group: "edges", data });
   }
 
   // Re-center on the focal node's TARGET world position, not its current
@@ -684,10 +750,31 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
             "arrow-scale": 2,
           },
         },
+        // Associated-with edges curve so they're visually distinct from the
+        // straight-line, arrow-tipped hierarchy edges. unbundled-bezier with
+        // a single midpoint control point gives a clean arc that doesn't
+        // collide with intermediate nodes when both endpoints are placed.
         {
           selector: "edge[kind = 'assoc']",
           style: {
             "target-arrow-shape": "none",
+            "curve-style": "unbundled-bezier",
+            "control-point-distances": [50],
+            "control-point-weights": [0.5],
+          },
+        },
+        // Background assoc edges — cross-tree connections between two
+        // non-focal nodes (e.g., CODY under PEOPLE associates with
+        // DOUBLELEAD under PROJECTS). Rendered behind the rest with z-index,
+        // thinner stroke, lower opacity, and no label so they read as
+        // hints rather than primary edges.
+        {
+          selector: "edge[background]",
+          style: {
+            "z-index": 0,
+            width: 1.5,
+            opacity: 0.4,
+            "line-style": "dashed",
           },
         },
       ],
