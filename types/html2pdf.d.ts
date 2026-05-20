@@ -21,7 +21,7 @@ declare module "html2pdf.js" {
 
   interface Html2Pdf {
     set(opt: Html2PdfOptions): Html2Pdf;
-    from(element: Element | string): Html2Pdf;
+    from(element: Element | string, type?: "element" | "string" | "canvas" | "img"): Html2Pdf;
     save(): Promise<void>;
     output(type?: string): Promise<Blob | string>;
     outputPdf(type?: string): Promise<Blob | string>;

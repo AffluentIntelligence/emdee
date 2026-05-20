@@ -108,32 +108,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;");
 }
 
-// PDF rendering happens against this hidden container. We park it
-// absolute-positioned off-screen (rather than position:fixed) so the
-// browser still gives it normal flow + layout, which html2canvas needs
-// to read clientHeight/scrollHeight. Visibility stays on — `visibility:
-// hidden` would make html2canvas skip the content.
-function createPdfStage(): HTMLDivElement {
-  const div = document.createElement("div");
-  div.style.cssText = [
-    "position:absolute",
-    "left:-99999px",
-    "top:0",
-    "width:794px", // ~A4 at 96dpi
-    "padding:24px",
-    "background:#ffffff",
-    "color:#1f2937",
-    'font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif',
-    "font-size:14px",
-    "line-height:1.6",
-  ].join(";");
-  document.body.appendChild(div);
-  return div;
-}
-
-function nextFrame(): Promise<void> {
-  return new Promise((r) => requestAnimationFrame(() => r()));
-}
 
 export function DownloadModal({ path, title, index, onClose }: Props) {
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set([path]));
@@ -201,42 +175,37 @@ export function DownloadModal({ path, title, index, onClose }: Props) {
         if (added === 0) throw new Error("No content available to download.");
       } else {
         const html2pdf = (await import("html2pdf.js")).default;
-        const stage = createPdfStage();
-        try {
-          let added = 0;
-          for (const p of sorted) {
-            const content = contentByPath.get(p);
-            if (typeof content !== "string") continue;
-            // Raw markdown rendered verbatim — what's in the .md file
-            // is what lands in the PDF. CJK glyphs fall back to the
-            // browser's system monospace stack.
-            stage.innerHTML = `<pre style="margin:0;white-space:pre-wrap;word-wrap:break-word;font-family:ui-monospace,SFMono-Regular,'SF Mono',Consolas,'Liberation Mono',monospace;font-size:11px;line-height:1.55;">${escapeHtml(content)}</pre>`;
-            // Force layout, then wait a frame so html2canvas can read
-            // the freshly-rendered dimensions. Without this the canvas
-            // captures a zero-height tree → blank PDF page.
-            void stage.offsetHeight;
-            await nextFrame();
-            const worker = html2pdf()
-              .set({
-                margin: [12, 14, 14, 14],
-                image: { type: "jpeg", quality: 0.95 },
-                html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
-                jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-                pagebreak: { mode: ["css", "legacy"] },
-              })
-              .from(stage);
-            const pdfOut = await worker.output("blob");
-            const pdfBlob = pdfOut instanceof Blob ? pdfOut : new Blob([pdfOut]);
-            const rel = p.startsWith(prefix) ? p.slice(prefix.length) : p;
-            const zipPath = rewriteZipPath(rel, ".pdf", slugToTitle, usedByDir);
-            zip.file(zipPath, pdfBlob);
-            added++;
-            setProgress({ done: added, total: sorted.length });
-          }
-          if (added === 0) throw new Error("No content available to download.");
-        } finally {
-          stage.remove();
+        let added = 0;
+        for (const p of sorted) {
+          const content = contentByPath.get(p);
+          if (typeof content !== "string") continue;
+          // String-mode input: html2pdf builds its own fresh container
+          // internally. An off-screen <div> source would leak its
+          // `left:-99999px` inline style through the clone (html2pdf
+          // overrides `position` but not `left`/`top`), pushing the
+          // content far off the PDF page and producing blank output.
+          const innerHtml =
+            `<div style="font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;color:#111827;">` +
+            `<pre style="margin:0;white-space:pre-wrap;word-wrap:break-word;font-family:inherit;font-size:11px;line-height:1.55;">${escapeHtml(content)}</pre>` +
+            `</div>`;
+          const worker = html2pdf()
+            .set({
+              margin: [12, 14, 14, 14],
+              image: { type: "jpeg", quality: 0.95 },
+              html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+              pagebreak: { mode: ["css", "legacy"] },
+            })
+            .from(innerHtml, "string");
+          const pdfOut = await worker.output("blob");
+          const pdfBlob = pdfOut instanceof Blob ? pdfOut : new Blob([pdfOut]);
+          const rel = p.startsWith(prefix) ? p.slice(prefix.length) : p;
+          const zipPath = rewriteZipPath(rel, ".pdf", slugToTitle, usedByDir);
+          zip.file(zipPath, pdfBlob);
+          added++;
+          setProgress({ done: added, total: sorted.length });
         }
+        if (added === 0) throw new Error("No content available to download.");
       }
 
       const blob = await zip.generateAsync({ type: "blob", compression: "DEFLATE" });
