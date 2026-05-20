@@ -1842,14 +1842,28 @@ a.sidebar-footer-btn { text-decoration: none; }
     max-width: 60vw;
   }
 
-  /* The graph's bottom-left controls (Focus chip, Prev/Next, Page nav,
-     zoom, breadcrumb) crowd the FAB area on small screens. Drop the
-     zoom buttons + Prev/Next Page nav — pinch + sidebar tree cover the
-     same ground. Keep Focus + Prev/Next Node + breadcrumb. */
+  /* Zoom +/- still hides on mobile — pinch covers it. Page nav comes
+     back here (the user can't paginate any other way on small screens).
+     The whole stack moves to TOP-left since the drawer + FAB own the
+     bottom now. */
   .zoom-control { display: none !important; }
-  .graph-controls-page-nav { display: none !important; }
-  /* Lift the graph controls above the FAB so they don't collide. */
-  .graph-controls { bottom: 84px; }
+  .graph-controls {
+    bottom: auto;
+    top: 12px;
+    left: 12px;
+    max-width: calc(100% - 24px);
+    gap: 3px;
+  }
+  .graph-controls-focal,
+  .graph-controls-row,
+  .graph-controls-breadcrumb { font-size: 11.5px; }
+  .graph-controls-btn { padding: 3px 8px; font-size: 11.5px; }
+  .graph-controls-page { font-size: 11.5px; padding: 0 4px; }
+
+  /* Doc-pane sibling-nav buttons disappear on mobile to keep the
+     drawer's toolbar slim — Prev/Next Node lives in the graph controls
+     instead. Export PDF stays. */
+  .toolbar .btn-sibling-nav { display: none; }
 
   .graph-bar {
     overflow-x: auto;
