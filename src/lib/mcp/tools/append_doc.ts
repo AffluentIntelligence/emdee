@@ -1,6 +1,19 @@
 import { createHash } from "node:crypto";
-import { validatePath, readVaultFile, writeVaultFile } from "./vault";
+import { validatePath, readVaultFile, writeVaultFile, loadVaultIndex } from "./vault";
+import { evaluateLintGate } from "./lint_gate";
+import { buildLintVaultContext } from "./lint_doc";
 import type { ToolContext } from "./types";
+
+const CROSS_DOC_CODES = new Set([
+  "asymmetric_parent_edge",
+  "asymmetric_child_edge",
+  "sibling_assoc_redundant",
+]);
+
+function parseGateCodes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((c): c is string => typeof c === "string");
+}
 
 function json(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -33,6 +46,17 @@ export async function appendDoc(ctx: ToolContext, args: Record<string, unknown>)
   // paragraph, regardless of whether the existing doc ended cleanly.
   const trimmed = content.replace(/\s+$/, "");
   const newContent = trimmed + "\n\n" + body.replace(/\s+$/, "") + "\n";
+
+  const gateCodes = parseGateCodes(args.gate_on_warnings);
+  if (gateCodes.length > 0) {
+    const needsVault = gateCodes.some((c) => CROSS_DOC_CODES.has(c));
+    const vaultCtx = needsVault ? buildLintVaultContext(await loadVaultIndex(ctx), rel) : undefined;
+    const gate = evaluateLintGate(newContent, gateCodes, vaultCtx);
+    if (!gate.ok) {
+      return json({ error: "lint_gate_failed", fixes: gate.fixes, original_warnings: gate.original_warnings });
+    }
+  }
+
   await writeVaultFile(ctx, rel, newContent);
   return json({ ok: true, content_hash: hashBody(body.trim()) });
 }

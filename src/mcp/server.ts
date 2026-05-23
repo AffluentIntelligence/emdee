@@ -118,7 +118,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "append_section",
       description:
-        "Append markdown content to the end of an existing H2 section. Section-scoped — safer than write_doc for incremental edits. Either `heading` or `section_id` (from get_doc.sections[].id) must be provided — `section_id` is the preferred exact-match lookup. Pass create_if_missing=true (with `heading`) to add a new H2 at the end of the file if not found (default false, returns section_not_found). Returns the new section_id + content_hash for follow-up patches. Edge convention: `## Associated with` is for cross-tree links only (e.g. project↔person, sprint↔learning). Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) of this doc — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
+        "Append markdown content to the end of an existing H2 section. Section-scoped — safer than write_doc for incremental edits. Either `heading` or `section_id` (from get_doc.sections[].id) must be provided — `section_id` is the preferred exact-match lookup. Pass create_if_missing=true (with `heading`) to add a new H2 at the end of the file if not found (default false, returns section_not_found). Returns the new section_id + content_hash for follow-up patches. Pass `gate_on_warnings: [\"code\", ...]` to hard-block the write when any of those lint codes would fire on the proposed content. Edge convention: `## Associated with` is for cross-tree links only (e.g. project↔person, sprint↔learning). Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) of this doc — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
       inputSchema: {
         type: "object",
         properties: {
@@ -130,6 +130,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "boolean",
             description: "If true, create the section at end of file when heading is not found. Default false.",
           },
+          gate_on_warnings: {
+            type: "array", items: { type: "string" },
+            description: "Lint codes that hard-block the write when they would fire on the proposed content. Default [].",
+          },
         },
         required: ["path", "body"],
       },
@@ -137,7 +141,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "patch_section",
       description:
-        "Replace the body of an existing H2 section. Version-guarded: pass expected_content_hash from a prior get_doc, append_section, or patch_section response. Either `heading` or `section_id` (from get_doc.sections[].id) must be provided — `section_id` is the preferred exact-match lookup. If both are provided and resolve to different sections, returns `section_id_heading_mismatch`. Mismatch on the hash returns a structured version_conflict error with the actual hash so you can re-read and reconcile. This is the ONLY safe path for destructive section edits — never use write_doc for incremental edits, it replaces the entire file and silently loses content. Edge convention: `## Associated with` is for cross-tree links only. Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
+        "Replace the body of an existing H2 section. Version-guarded: pass expected_content_hash from a prior get_doc, append_section, or patch_section response. Either `heading` or `section_id` (from get_doc.sections[].id) must be provided — `section_id` is the preferred exact-match lookup. If both are provided and resolve to different sections, returns `section_id_heading_mismatch`. Mismatch on the hash returns a structured version_conflict error with the actual hash so you can re-read and reconcile. Pass `gate_on_warnings: [\"code\", ...]` to hard-block the write when any of those lint codes would fire on the proposed content. This is the ONLY safe path for destructive section edits — never use write_doc for incremental edits, it replaces the entire file and silently loses content. Edge convention: `## Associated with` is for cross-tree links only. Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
       inputSchema: {
         type: "object",
         properties: {
@@ -148,6 +152,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           expected_content_hash: {
             type: "string",
             description: "Short hash of the section's current body (from get_doc.sections or a previous mutation's response).",
+          },
+          gate_on_warnings: {
+            type: "array", items: { type: "string" },
+            description: "Lint codes that hard-block the write when they would fire on the proposed content. Default [].",
           },
         },
         required: ["path", "body", "expected_content_hash"],
@@ -169,12 +177,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "write_doc",
       description:
-        "Create or overwrite a markdown doc at the given relative path. DESTRUCTIVE — full-file replacement, silently deletes any content not in the new payload. Use append_section or patch_section for incremental edits. Always run write_doc_preview first to see what would be lost. Edge convention: `## Associated with` is for cross-tree links only. Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
+        "Create or overwrite a markdown doc at the given relative path. DESTRUCTIVE — full-file replacement, silently deletes any content not in the new payload. Use append_section or patch_section for incremental edits. Always run write_doc_preview first to see what would be lost. Pass `gate_on_warnings: [\"code\", ...]` to hard-block the write when any of those lint codes would fire on the proposed content. Edge convention: `## Associated with` is for cross-tree links only. Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
       inputSchema: {
         type: "object",
         properties: {
           path: { type: "string" },
           content: { type: "string" },
+          gate_on_warnings: {
+            type: "array", items: { type: "string" },
+            description: "Lint codes that hard-block the write when they would fire on the proposed content. Default [].",
+          },
         },
         required: ["path", "content"],
       },

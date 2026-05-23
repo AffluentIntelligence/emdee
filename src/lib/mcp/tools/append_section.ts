@@ -1,7 +1,34 @@
 import { createHash } from "node:crypto";
-import { validatePath, readVaultFile, writeVaultFile } from "./vault";
+import { validatePath, readVaultFile, writeVaultFile, loadVaultIndex } from "./vault";
+import { evaluateLintGate } from "./lint_gate";
+import { buildLintVaultContext } from "./lint_doc";
 import { sectionId } from "./get_doc";
 import type { ToolContext } from "./types";
+
+const CROSS_DOC_CODES = new Set([
+  "asymmetric_parent_edge",
+  "asymmetric_child_edge",
+  "sibling_assoc_redundant",
+]);
+
+function parseGateCodes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((c): c is string => typeof c === "string");
+}
+
+async function runGateOrError(
+  ctx: ToolContext,
+  rel: string,
+  proposed: string,
+  gateCodes: string[],
+): Promise<{ error: "lint_gate_failed"; fixes: unknown; original_warnings: unknown } | null> {
+  if (gateCodes.length === 0) return null;
+  const needsVault = gateCodes.some((c) => CROSS_DOC_CODES.has(c));
+  const vaultCtx = needsVault ? buildLintVaultContext(await loadVaultIndex(ctx), rel) : undefined;
+  const gate = evaluateLintGate(proposed, gateCodes, vaultCtx);
+  if (gate.ok) return null;
+  return { error: "lint_gate_failed", fixes: gate.fixes, original_warnings: gate.original_warnings };
+}
 
 function json(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -97,6 +124,9 @@ export async function appendSection(ctx: ToolContext, args: Record<string, unkno
     }
     const sep = content.endsWith("\n") ? "" : "\n";
     const newContent = content + sep + `\n## ${headingArg}\n\n${body}\n`;
+    const gateCodes = parseGateCodes(args.gate_on_warnings);
+    const gateErr = await runGateOrError(ctx, rel, newContent, gateCodes);
+    if (gateErr) return json(gateErr);
     await writeVaultFile(ctx, rel, newContent);
     const newSections = parseSections(newContent);
     const newIdx = newSections.findIndex((s) => s.heading === headingArg);
@@ -113,6 +143,9 @@ export async function appendSection(ctx: ToolContext, args: Record<string, unkno
   while (sectionLines.length > 1 && sectionLines[sectionLines.length - 1].trim() === "") sectionLines.pop();
   sectionLines.push("", ...body.split("\n"), "");
   const newContent = [...lines.slice(0, target.headingLineIdx), ...sectionLines, ...lines.slice(target.bodyEndLineIdx)].join("\n");
+  const gateCodes = parseGateCodes(args.gate_on_warnings);
+  const gateErr = await runGateOrError(ctx, rel, newContent, gateCodes);
+  if (gateErr) return json(gateErr);
   await writeVaultFile(ctx, rel, newContent);
 
   const newSections = parseSections(newContent);

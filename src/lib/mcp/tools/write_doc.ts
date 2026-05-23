@@ -1,9 +1,25 @@
-import { validatePath, writeVaultFile } from "./vault";
+import { validatePath, writeVaultFile, loadVaultIndex } from "./vault";
 import { lintDocContent } from "./lint";
+import { evaluateLintGate } from "./lint_gate";
+import { buildLintVaultContext } from "./lint_doc";
 import type { ToolContext } from "./types";
 
 function json(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
+}
+
+// Codes whose detection needs vault context (cross-doc lookups). Pulling
+// the index is expensive on the hot path, so we only do it when the
+// caller explicitly gated on one of these. Keep in sync with lint.ts.
+const CROSS_DOC_CODES = new Set([
+  "asymmetric_parent_edge",
+  "asymmetric_child_edge",
+  "sibling_assoc_redundant",
+]);
+
+function parseGateCodes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((c): c is string => typeof c === "string");
 }
 
 /**
@@ -11,11 +27,28 @@ function json(value: unknown) {
  * surfaced from the just-written content (missing preamble, undeclared
  * inline mentions). Warnings are signal, not gate — the write always
  * succeeds; the caller decides whether to act on them.
+ *
+ * Opt-in hard gate via `gate_on_warnings: string[]` — when non-empty,
+ * the proposed content is linted BEFORE the write; if any warning whose
+ * code is in the list fires, the write is skipped and the response is
+ * `{ error: "lint_gate_failed", fixes, original_warnings }`. Default
+ * `[]` preserves the legacy signal-not-gate behaviour.
  */
 export async function writeDoc(ctx: ToolContext, args: Record<string, unknown>): Promise<unknown> {
   const rel = String(args.path);
   validatePath(rel);
   const content = String(args.content ?? "");
+  const gateCodes = parseGateCodes(args.gate_on_warnings);
+
+  if (gateCodes.length > 0) {
+    const needsVault = gateCodes.some((c) => CROSS_DOC_CODES.has(c));
+    const vaultCtx = needsVault ? buildLintVaultContext(await loadVaultIndex(ctx), rel) : undefined;
+    const gate = evaluateLintGate(content, gateCodes, vaultCtx);
+    if (!gate.ok) {
+      return json({ error: "lint_gate_failed", fixes: gate.fixes, original_warnings: gate.original_warnings });
+    }
+  }
+
   await writeVaultFile(ctx, rel, content);
 
   const lint = lintDocContent(content);
