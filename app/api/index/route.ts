@@ -105,19 +105,30 @@ export async function GET(request: Request) {
   // markdown re-parse cost here. Local dev keeps the indexer's edges so
   // EMDEE_DOCS workflows don't need a database round-trip.
   if (!isLocal) {
-    // Supabase JS client defaults to a 1000-row cap. The user's vault
-    // crossed that bar — without an explicit `.range()`, edges past row
-    // 1000 silently drop and the graph loses anything that resolved
-    // alphabetically late (e.g., paths starting with `events/seminars/
-    // SFPDI/SFPDI-DAY2-…` lose their hierarchy edges). Lift the cap
-    // explicitly. Replace with proper pagination if vaults start
-    // crossing ~50k edges.
-    const { data: rows, error } = await adminClient()
-      .from("doc_edges")
-      .select("from_path, to_path, kind")
-      .eq("namespace", ns)
-      .range(0, 49999);
-    if (!error && rows) {
+    // Supabase enforces a server-side `db-max-rows: 1000` cap that
+    // overrides client `.range()`. For vaults with > 1000 edges (which
+    // the user crossed at ~600 docs), the first attempt at lifting the
+    // cap by passing `.range(0, 49999)` silently truncated to 1000.
+    // Paginate explicitly — 1000 rows per request — and stop when a
+    // page returns less than full. At 1622 edges this is 2 round-trips
+    // (still well under the 100ms tier budget).
+    const PAGE_SIZE = 1000;
+    const rows: { from_path: string; to_path: string; kind: string }[] = [];
+    let pageStart = 0;
+    let error: Error | { message: string } | null = null;
+    while (true) {
+      const { data, error: pageErr } = await adminClient()
+        .from("doc_edges")
+        .select("from_path, to_path, kind")
+        .eq("namespace", ns)
+        .range(pageStart, pageStart + PAGE_SIZE - 1);
+      if (pageErr) { error = pageErr; break; }
+      if (!data || data.length === 0) break;
+      rows.push(...data);
+      if (data.length < PAGE_SIZE) break;
+      pageStart += PAGE_SIZE;
+    }
+    if (!error) {
       // Assoc rows are stored once per direction in doc_edges (two rows
       // per pair); the indexer's Edge[] expects one row per pair with
       // from < to. Dedupe accordingly so the graph renderer doesn't
