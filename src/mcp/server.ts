@@ -92,10 +92,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "get_doc",
       description:
-        "Return the full markdown content of one doc plus a `sections` array with each H2 section's content_hash. Use the hashes for follow-up patch_section calls. More expensive — only call after deciding (via summary or neighbors) that the full body is needed.",
+        "Returns title + summary + preamble + section headings (with content_hash for follow-up patch_section). Pass `full=true` for the body. Use `get_context` instead when you need the focal + its neighbourhood — cheaper than chaining get_doc + get_neighbors.",
       inputSchema: {
         type: "object",
-        properties: { path: { type: "string" } },
+        properties: {
+          path: { type: "string" },
+          full: { type: "boolean", description: "Include the full markdown content. Default false — light envelope only." },
+        },
         required: ["path"],
       },
     },

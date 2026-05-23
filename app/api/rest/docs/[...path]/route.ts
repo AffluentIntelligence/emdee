@@ -52,7 +52,10 @@ export async function GET(req: Request, ctx: RouteCtx) {
   const path = segments.join("/");
 
   try {
-    const wrapped = await getDoc(auth, { path });
+    // SPRINT-018 Phase 5: get_doc now returns a light envelope by
+    // default. This REST endpoint contracts on the full body, so
+    // explicitly opt in via full=true.
+    const wrapped = await getDoc(auth, { path, full: true });
     const payload = unwrap<{
       path: string;
       title: string;

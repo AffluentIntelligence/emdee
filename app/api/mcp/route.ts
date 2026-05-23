@@ -45,8 +45,12 @@ function buildMcpServer(ctx: ToolContext): Server {
       instructions: `You are working inside an Emdee vault — a plain-markdown knowledge graph.
 
 BEFORE writing or editing any doc:
-1. Call get_doc("INFO.md") to load vault conventions.
+1. Call get_doc("INFO.md", full=true) to load vault conventions — get_doc now returns the light envelope by default; pass full=true when you actually need the body.
 2. Use patch_section for incremental edits — never write_doc for single-section changes.
+
+Read-side defaults (SPRINT-018):
+- get_doc returns title + summary + preamble + section headings only. Pass full=true for the body.
+- get_context is the multi-hop big sibling of get_neighbors — returns the focal + neighbourhood within a token budget. Prefer it over chaining get_doc + get_neighbors when you need a coherent local view.
 
 Key conventions:
 - Every doc starts with one H1 + one > blockquote summary immediately below it.
@@ -73,7 +77,7 @@ Shared docs:
       { name: "get_summary", description: "Return {path, title, summary} for one doc.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "get_neighbors", description: "Return the doc plus its 1-hop neighborhood.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "get_context", description: "Return the focal doc plus its multi-hop neighbourhood within a token budget. Focal + 1-hop neighbours get full bodies (when include_full); deeper hops get summary only. Nodes that don't fit in budget_tokens land in budget.dropped_paths. Use this instead of chaining get_doc + get_neighbors when you need a coherent local view.", inputSchema: { type: "object", properties: { path: { type: "string" }, hops: { type: "number", description: "Max BFS depth, 1–3. Default 2." }, budget_tokens: { type: "number", description: "Rough token cap (chars÷4). Default 8000." }, include_full: { type: "boolean", description: "Inline focal + hop-1 bodies. Default true." }, include_associates: { type: "boolean", description: "Include assoc edges in the walk. Default true." } }, required: ["path"] } },
-      { name: "get_doc", description: "Return full markdown content of one doc plus sections with content_hash.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
+      { name: "get_doc", description: "Returns title + summary + preamble + section headings (with content_hash for patch_section). Pass `full=true` for the body. Use `get_context` instead when you need the focal + its neighbourhood — that's cheaper than chaining get_doc + get_neighbors.", inputSchema: { type: "object", properties: { path: { type: "string" }, full: { type: "boolean", description: "Include the full markdown content. Default false — light envelope only." } }, required: ["path"] } },
       { name: "search", description: "Case-insensitive search over titles, summaries, and content.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] } },
       { name: "append_section", description: "Append markdown content to the END of an existing H2 section's body. NOTE: when the section isn't the doc's last, this lands mid-doc. For chronological note-taking that should always land at the bottom of the page, use append_doc instead.", inputSchema: { type: "object", properties: { path: { type: "string" }, heading: { type: "string" }, body: { type: "string" }, create_if_missing: { type: "boolean" } }, required: ["path", "heading", "body"] } },
       { name: "append_doc", description: "Append content to the very end of a doc (after every existing section). For chronological note-taking — LOGS, daily notes, anywhere new content should land at the bottom of the page regardless of section structure. The body may include its own `##` headings to introduce new sections at the end.", inputSchema: { type: "object", properties: { path: { type: "string" }, body: { type: "string" } }, required: ["path", "body"] } },

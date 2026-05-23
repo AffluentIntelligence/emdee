@@ -40,21 +40,31 @@ function hashBody(body: string): string {
   return createHash("sha256").update(body, "utf8").digest("hex").slice(0, 16);
 }
 
+/**
+ * Return doc metadata. SPRINT-018 Phase 5: the body is now opt-in via
+ * `full=true`. The default response is light — title + summary +
+ * preamble + section headings — and is intended as the staple
+ * navigation primitive. Callers that need the full markdown body must
+ * either pass `full: true` or (preferred for graph-aware queries) use
+ * `get_context` to get the focal + its neighbourhood in one call.
+ */
 export async function getDoc(ctx: ToolContext, args: Record<string, unknown>): Promise<unknown> {
   const idx = await loadVaultIndex(ctx);
   const doc = idx.docs.find((d) => d.path === String(args.path));
   if (!doc) throw new Error(`no such doc: ${args.path}`);
+  const full = Boolean(args.full);
   const sections = parseSections(doc.content).map((s) => ({
     heading: s.heading,
     content_hash: hashBody(extractBody(doc.content, s)),
   }));
   const preamble = extractPreamble(doc.content);
-  return json({
+  const payload: Record<string, unknown> = {
     path: doc.path,
     title: doc.title,
     summary: doc.summary,
-    content: doc.content,
     preamble: preamble ?? undefined,
     sections,
-  });
+  };
+  if (full) payload.content = doc.content;
+  return json(payload);
 }
