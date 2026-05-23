@@ -45,7 +45,11 @@ export async function lintDoc(ctx: ToolContext, args: Record<string, unknown>): 
     });
   }
 
-  const lintCtx: LintVaultContext = { selfPath: rel, docsByTitle };
+  const selfEntry = docsByTitle.get(
+    (index.docs.find((d) => d.path === rel)?.title ?? "").toLowerCase()
+  );
+  const selfDeclaredParents = selfEntry?.declaredParents ?? [];
+  const lintCtx: LintVaultContext = { selfPath: rel, selfDeclaredParents, docsByTitle };
   const result = lintDocContent(content, lintCtx);
   return json({ path: rel, ...result });
 }

@@ -98,7 +98,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "append_section",
       description:
-        "Append markdown content to the end of an existing H2 section. Section-scoped — safer than write_doc for incremental edits. Pass create_if_missing=true to add a new H2 section at the end of the file if the heading doesn't exist (default false, returns section_not_found error). Returns the new content_hash of the section for follow-up patches.",
+        "Append markdown content to the end of an existing H2 section. Section-scoped — safer than write_doc for incremental edits. Pass create_if_missing=true to add a new H2 section at the end of the file if the heading doesn't exist (default false, returns section_not_found error). Returns the new content_hash of the section for follow-up patches. Edge convention: `## Associated with` is for cross-tree links only (e.g. project↔person, sprint↔learning). Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) of this doc — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
       inputSchema: {
         type: "object",
         properties: {
@@ -116,7 +116,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "patch_section",
       description:
-        "Replace the body of an existing H2 section. Version-guarded: pass expected_content_hash from a prior get_doc, append_section, or patch_section response. Mismatch returns a structured version_conflict error with the actual hash so you can re-read and reconcile. This is the ONLY safe path for destructive section edits — never use write_doc for incremental edits, it replaces the entire file and silently loses content.",
+        "Replace the body of an existing H2 section. Version-guarded: pass expected_content_hash from a prior get_doc, append_section, or patch_section response. Mismatch returns a structured version_conflict error with the actual hash so you can re-read and reconcile. This is the ONLY safe path for destructive section edits — never use write_doc for incremental edits, it replaces the entire file and silently loses content. Edge convention: `## Associated with` is for cross-tree links only. Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
       inputSchema: {
         type: "object",
         properties: {
@@ -147,7 +147,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "write_doc",
       description:
-        "Create or overwrite a markdown doc at the given relative path. DESTRUCTIVE — full-file replacement, silently deletes any content not in the new payload. Use append_section or patch_section for incremental edits. Always run write_doc_preview first to see what would be lost.",
+        "Create or overwrite a markdown doc at the given relative path. DESTRUCTIVE — full-file replacement, silently deletes any content not in the new payload. Use append_section or patch_section for incremental edits. Always run write_doc_preview first to see what would be lost. Edge convention: `## Associated with` is for cross-tree links only. Do NOT add an associate that's already a parent/child OR a sibling (shares a parent) — the hierarchy already conveys that relationship and duplicate edges get suppressed in the graph.",
       inputSchema: {
         type: "object",
         properties: {

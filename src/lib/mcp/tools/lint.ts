@@ -25,7 +25,8 @@ export interface LintWarning {
     | "multiple_child_of"
     | "asymmetric_parent_edge"
     | "asymmetric_child_edge"
-    | "associate_duplicates_hierarchy";
+    | "associate_duplicates_hierarchy"
+    | "sibling_assoc_redundant";
   message: string;
   suggestion: string;
   title?: string;
@@ -52,6 +53,10 @@ export interface LintResult {
 export interface LintVaultContext {
   /** Path of the doc being linted, so cross-doc checks can locate "me" by path. */
   selfPath: string;
+  /** This doc's resolved parent paths (from `## Child of`). Used by the
+   *  sibling-assoc check to detect when an assoc target is actually a sibling
+   *  (i.e. shares one of these parents). */
+  selfDeclaredParents: string[];
   /** Every doc in the vault, by title-lowercased — used to resolve wiki-link targets. */
   docsByTitle: Map<string, { path: string; title: string; declaredParents: string[]; declaredChildren: string[] }>;
 }
@@ -226,6 +231,31 @@ export function lintDocContent(content: string, ctx?: LintVaultContext): LintRes
         suggestion: `Remove \`[[${t}]]\` from \`## Associated with\` — the parent/child relationship is the canonical link and the assoc bullet is being suppressed in the graph anyway.`,
         title: t,
       });
+    }
+  }
+
+  // Sibling assoc redundancy: when an associate target shares one of
+  // this doc's parents, the two are siblings. The shared-parent edge
+  // already implies the relationship — `## Associated with` is for
+  // cross-tree links (e.g. project↔person), not for linking peers under
+  // the same parent. Indexer suppresses these in the graph; this lint
+  // surfaces them so the markdown can be cleaned.
+  if (ctx && ctx.selfDeclaredParents.length > 0) {
+    const selfParents = new Set(ctx.selfDeclaredParents);
+    for (const t of assocTitles) {
+      // Skip pairs already flagged by the hierarchy-overlap rule above.
+      if (childOfTitles.has(t) || parentOfTitles.has(t)) continue;
+      const target = ctx.docsByTitle.get(t);
+      if (!target) continue;
+      const sharedParent = target.declaredParents.find((p) => selfParents.has(p));
+      if (sharedParent) {
+        warnings.push({
+          code: "sibling_assoc_redundant",
+          message: `\`[[${t}]]\` is listed in \`## Associated with\` but shares the parent \`${sharedParent}\` with this doc — the two are siblings, already related through their common parent.`,
+          suggestion: `Remove \`[[${t}]]\` from \`## Associated with\`. \`## Associated with\` is for cross-tree links (e.g. project↔person, sprint↔learning), not for connecting docs that share a parent.`,
+          title: t,
+        });
+      }
     }
   }
 

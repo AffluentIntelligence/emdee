@@ -21,12 +21,26 @@ function buildNeighbors(idx: DocIndex, focal: DocNode) {
   const declaredAssoc = new Map<string, NeighborRef>();
   for (const l of focal.parents) { const n = resolve(l.title); if (n) declaredParents.set(n.path, refFor(n, l.note)); }
   for (const l of focal.children) { const n = resolve(l.title); if (n) declaredChildren.set(n.path, refFor(n, l.note)); }
+  // Compute focal's parent paths once for the sibling check below.
+  const focalParentPaths = new Set(
+    focal.parents
+      .map((l) => resolve(l.title)?.path)
+      .filter((p): p is string => !!p)
+  );
   for (const l of focal.associates) {
     const n = resolve(l.title);
     if (!n) continue;
     // Hierarchy beats associate — if the target is already a parent or
-    // child of this focal, drop the assoc entry rather than double-listing.
+    // child of this focal, drop the assoc entry.
     if (declaredParents.has(n.path) || declaredChildren.has(n.path)) continue;
+    // Sibling beats associate — if the target shares one of this focal's
+    // parents, the relationship is already conveyed by the hierarchy.
+    if (focalParentPaths.size > 0) {
+      const candidateParentPaths = n.parents
+        .map((pl) => resolve(pl.title)?.path)
+        .filter((p): p is string => !!p);
+      if (candidateParentPaths.some((p) => focalParentPaths.has(p))) continue;
+    }
     declaredAssoc.set(n.path, refFor(n, l.note));
   }
 

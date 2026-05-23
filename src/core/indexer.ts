@@ -240,11 +240,13 @@ export function buildIndexFromContents(files: { path: string; content: string }[
     edges.push({ from: x, to: y, kind: "assoc" });
   };
 
-  // Pass 1: hierarchy. Pass 2: associates, skipping any pair that's
-  // already linked hierarchically — the hierarchy edge is the canonical
-  // expression of the relationship and duplicating it as an assoc just
-  // double-draws in the graph. lint_doc surfaces the same condition as
-  // `associate_duplicates_hierarchy` so the markdown can be cleaned.
+  // Pass 1: hierarchy. Pass 2: associates, dropping pairs that are
+  // already conveyed by the hierarchy (direct parent/child OR shared
+  // parent — i.e. siblings). The hierarchy edge or the implicit
+  // sibling-through-parent relationship is the canonical link;
+  // duplicating it as an assoc just double-draws in the graph.
+  // lint_doc surfaces the same conditions (`associate_duplicates_hierarchy`,
+  // `sibling_assoc_redundant`) so the markdown can be cleaned at source.
   for (const d of docs) {
     for (const link of d.children) {
       const childPath = resolve(link.title, d.path);
@@ -255,11 +257,30 @@ export function buildIndexFromContents(files: { path: string; content: string }[
       if (parentPath) pushHier(parentPath, d.path);
     }
   }
+
+  // Build a child→parents map from the hierarchy edges we just pushed,
+  // so the assoc pass can detect "these two docs share a parent" cheaply.
+  const parentsOf = new Map<string, Set<string>>();
+  for (const e of edges) {
+    if (e.kind !== "hierarchy") continue;
+    const set = parentsOf.get(e.to) ?? new Set<string>();
+    set.add(e.from);
+    parentsOf.set(e.to, set);
+  }
+  const shareParent = (a: string, b: string): boolean => {
+    const pa = parentsOf.get(a);
+    const pb = parentsOf.get(b);
+    if (!pa || !pb) return false;
+    for (const p of pa) if (pb.has(p)) return true;
+    return false;
+  };
+
   for (const d of docs) {
     for (const link of d.associates) {
       const assocPath = resolve(link.title, d.path);
       if (!assocPath) continue;
       if (seen.has(`H:${d.path}->${assocPath}`) || seen.has(`H:${assocPath}->${d.path}`)) continue;
+      if (shareParent(d.path, assocPath)) continue;
       pushAssoc(d.path, assocPath);
     }
   }
