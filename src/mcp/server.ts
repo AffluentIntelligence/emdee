@@ -10,6 +10,7 @@ import {
   listDocs,
   getSummary,
   getNeighbors,
+  getContext,
   getDoc,
   search,
   appendSection,
@@ -69,6 +70,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: "object",
         properties: { path: { type: "string" } },
+        required: ["path"],
+      },
+    },
+    {
+      name: "get_context",
+      description:
+        "Return the focal doc plus its multi-hop neighbourhood within a token budget. Focal + 1-hop neighbours get full bodies (when include_full=true); deeper hops get summary only. Nodes that don't fit in budget_tokens land in budget.dropped_paths. Use this instead of chaining get_doc + get_neighbors when you need a coherent local view of one doc and what surrounds it.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          hops: { type: "number", description: "Max BFS depth, 1–3. Default 2." },
+          budget_tokens: { type: "number", description: "Rough token cap (chars÷4). Default 8000." },
+          include_full: { type: "boolean", description: "Inline focal + hop-1 bodies. Default true." },
+          include_associates: { type: "boolean", description: "Include assoc edges in the walk. Default true." },
+        },
         required: ["path"],
       },
     },
@@ -168,6 +185,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolRes
     case "list_docs":         return await listDocs(ctx, a) as CallToolResult;
     case "get_summary":       return await getSummary(ctx, a) as CallToolResult;
     case "get_neighbors":     return await getNeighbors(ctx, a) as CallToolResult;
+    case "get_context":       return await getContext(ctx, a) as CallToolResult;
     case "get_doc":           return await getDoc(ctx, a) as CallToolResult;
     case "search":            return await search(ctx, a) as CallToolResult;
     case "append_section":    return await appendSection(ctx, a) as CallToolResult;

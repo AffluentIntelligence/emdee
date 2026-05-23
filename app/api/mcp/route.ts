@@ -5,7 +5,7 @@ import { clerkIdFromOAuthToken } from "@/src/lib/supabase/oauth";
 import { SupabaseStorage } from "@/src/lib/storage/SupabaseStorage";
 import type { ToolContext } from "@/src/lib/mcp/tools/types";
 import {
-  listDocs, getSummary, getNeighbors, getDoc, search,
+  listDocs, getSummary, getNeighbors, getContext, getDoc, search,
   appendSection, patchSection, writeDocPreview, writeDoc, deleteDoc, splitDoc, renameDoc, patchPreamble, appendDoc,
   lintDoc, distillDoc, materializeSubgroup,
 } from "@/src/lib/mcp/tools/index";
@@ -72,6 +72,7 @@ Shared docs:
       { name: "list_docs", description: "Enumerate every doc in the vault as {path, title, summary}.", inputSchema: { type: "object", properties: {} } },
       { name: "get_summary", description: "Return {path, title, summary} for one doc.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "get_neighbors", description: "Return the doc plus its 1-hop neighborhood.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
+      { name: "get_context", description: "Return the focal doc plus its multi-hop neighbourhood within a token budget. Focal + 1-hop neighbours get full bodies (when include_full); deeper hops get summary only. Nodes that don't fit in budget_tokens land in budget.dropped_paths. Use this instead of chaining get_doc + get_neighbors when you need a coherent local view.", inputSchema: { type: "object", properties: { path: { type: "string" }, hops: { type: "number", description: "Max BFS depth, 1–3. Default 2." }, budget_tokens: { type: "number", description: "Rough token cap (chars÷4). Default 8000." }, include_full: { type: "boolean", description: "Inline focal + hop-1 bodies. Default true." }, include_associates: { type: "boolean", description: "Include assoc edges in the walk. Default true." } }, required: ["path"] } },
       { name: "get_doc", description: "Return full markdown content of one doc plus sections with content_hash.", inputSchema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] } },
       { name: "search", description: "Case-insensitive search over titles, summaries, and content.", inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } }, required: ["query"] } },
       { name: "append_section", description: "Append markdown content to the END of an existing H2 section's body. NOTE: when the section isn't the doc's last, this lands mid-doc. For chronological note-taking that should always land at the bottom of the page, use append_doc instead.", inputSchema: { type: "object", properties: { path: { type: "string" }, heading: { type: "string" }, body: { type: "string" }, create_if_missing: { type: "boolean" } }, required: ["path", "heading", "body"] } },
@@ -96,6 +97,7 @@ Shared docs:
       case "list_docs":         return await listDocs(ctx, a) as CallToolResult;
       case "get_summary":       return await getSummary(ctx, a) as CallToolResult;
       case "get_neighbors":     return await getNeighbors(ctx, a) as CallToolResult;
+      case "get_context":       return await getContext(ctx, a) as CallToolResult;
       case "get_doc":           return await getDoc(ctx, a) as CallToolResult;
       case "search":            return await search(ctx, a) as CallToolResult;
       case "append_section":    return await appendSection(ctx, a) as CallToolResult;

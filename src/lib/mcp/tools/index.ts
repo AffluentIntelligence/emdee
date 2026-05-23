@@ -1,6 +1,7 @@
 export { listDocs } from "./list_docs";
 export { getSummary } from "./get_summary";
 export { getNeighbors } from "./get_neighbors";
+export { getContext } from "./get_context";
 export { getDoc } from "./get_doc";
 export { search } from "./search";
 export { appendSection } from "./append_section";
