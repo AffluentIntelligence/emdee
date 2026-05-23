@@ -9,6 +9,7 @@ import {
   appendSection, patchSection, writeDocPreview, writeDoc, deleteDoc, splitDoc, renameDoc, patchPreamble, appendDoc,
   lintDoc, distillDoc, materializeSubgroup, createChild, addAssociation,
 } from "@/src/lib/mcp/tools/index";
+import { logMcpActivity } from "@/src/lib/mcp/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +107,12 @@ Shared docs:
   server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolResult> => {
     const { name, arguments: args } = req.params;
     const a = args ?? {};
+    // SPRINT-021: fire-and-forget activity log. Only cloud mode has a
+    // clerk_id; local dev sessions are skipped. We don't await — the
+    // insert latency must never block the tool call.
+    if (ctx.mode === "cloud") {
+      void logMcpActivity(ctx.userId, ctx.userId, name, a);
+    }
     switch (name) {
       case "list_docs":         return await listDocs(ctx, a) as CallToolResult;
       case "get_summary":       return await getSummary(ctx, a) as CallToolResult;
