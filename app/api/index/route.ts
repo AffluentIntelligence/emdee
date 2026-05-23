@@ -105,10 +105,18 @@ export async function GET(request: Request) {
   // markdown re-parse cost here. Local dev keeps the indexer's edges so
   // EMDEE_DOCS workflows don't need a database round-trip.
   if (!isLocal) {
+    // Supabase JS client defaults to a 1000-row cap. The user's vault
+    // crossed that bar — without an explicit `.range()`, edges past row
+    // 1000 silently drop and the graph loses anything that resolved
+    // alphabetically late (e.g., paths starting with `events/seminars/
+    // SFPDI/SFPDI-DAY2-…` lose their hierarchy edges). Lift the cap
+    // explicitly. Replace with proper pagination if vaults start
+    // crossing ~50k edges.
     const { data: rows, error } = await adminClient()
       .from("doc_edges")
       .select("from_path, to_path, kind")
-      .eq("namespace", ns);
+      .eq("namespace", ns)
+      .range(0, 49999);
     if (!error && rows) {
       // Assoc rows are stored once per direction in doc_edges (two rows
       // per pair); the indexer's Edge[] expects one row per pair with
