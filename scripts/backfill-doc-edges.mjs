@@ -102,6 +102,42 @@ function filenameSlug(p) {
   return last.replace(/\.md$/i, "").toLowerCase();
 }
 
+// Mirror of src/core/resolveLink.ts → pickByLocality. When two docs
+// share a title or slug, the linking doc's path breaks the tie by
+// preferring nearby candidates (siblings → descendants → ancestors).
+function eqSegs(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+function sharedPrefix(a, b) {
+  const n = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < n && a[i] === b[i]) i++;
+  return i;
+}
+function pickByLocality(paths, fromPath) {
+  if (!fromPath || paths.length === 0) return paths[0];
+  const fromSegs = fromPath.split("/");
+  const fromDir = fromSegs.slice(0, -1);
+  const fromBase = (fromSegs[fromSegs.length - 1] ?? "").replace(/\.md$/i, "");
+  let best = paths[0];
+  let bestScore = -1;
+  for (const p of paths) {
+    const cSegs = p.split("/");
+    const cDir = cSegs.slice(0, -1);
+    const shared = sharedPrefix(fromDir, cDir);
+    let tier = 1;
+    if (eqSegs(cDir, fromDir)) tier = 5;
+    else if (cDir.length > fromDir.length && eqSegs(cDir.slice(0, fromDir.length), fromDir) && cDir[fromDir.length] === fromBase) tier = 4;
+    else if (fromDir.length > cDir.length && eqSegs(fromDir.slice(0, cDir.length), cDir)) tier = 3;
+    else if (shared > 0) tier = 2;
+    const score = tier * 1000 + shared;
+    if (score > bestScore) { bestScore = score; best = p; }
+  }
+  return best;
+}
+
 // --- main -----------------------------------------------------------
 
 console.log("Reading vault_files…");
@@ -124,18 +160,32 @@ for (const [ns, docs] of byNs) {
 
   // Title-or-slug resolution map. Title is the doc's H1 (lowercased);
   // slug is the filename without `.md` (lowercased). Title takes
-  // precedence — same priority order as the indexer.
+  // precedence — same priority order as the indexer. Multi-mapped so
+  // collisions (e.g. two DAY1s in different folders) can be broken by
+  // the linking doc's path via pickByLocality.
   const titleMap = new Map();
   const slugMap = new Map();
   for (const d of docs) {
     const title = deriveTitle(d.path, d.content).toLowerCase();
     const slug = filenameSlug(d.path);
-    if (!titleMap.has(title)) titleMap.set(title, d.path);
-    if (!slugMap.has(slug)) slugMap.set(slug, d.path);
+    const titleArr = titleMap.get(title) ?? [];
+    titleArr.push(d.path);
+    titleMap.set(title, titleArr);
+    const slugArr = slugMap.get(slug) ?? [];
+    slugArr.push(d.path);
+    slugMap.set(slug, slugArr);
   }
-  const resolve = (t) => {
+  const resolve = (t, fromPath) => {
     const lower = t.toLowerCase();
-    return titleMap.get(lower) ?? slugMap.get(lower);
+    const titles = titleMap.get(lower);
+    if (titles && titles.length > 0) {
+      return titles.length === 1 ? titles[0] : pickByLocality(titles, fromPath);
+    }
+    const slugs = slugMap.get(lower);
+    if (slugs && slugs.length > 0) {
+      return slugs.length === 1 ? slugs[0] : pickByLocality(slugs, fromPath);
+    }
+    return undefined;
   };
 
   // Hierarchy: prefer parent_of declarations (authoritative for sibling
@@ -147,7 +197,7 @@ for (const [ns, docs] of byNs) {
     let pos = 0;
     for (const b of bullets) {
       if (b.kind !== "parent_of") continue;
-      const target = resolve(b.target);
+      const target = resolve(b.target, d.path);
       if (!target || target === d.path) continue;
       hierMap.set(`${d.path}::${target}`, {
         namespace: ns,
@@ -163,7 +213,7 @@ for (const [ns, docs] of byNs) {
     const bullets = parseEdges(d.content);
     for (const b of bullets) {
       if (b.kind !== "child_of") continue;
-      const target = resolve(b.target);
+      const target = resolve(b.target, d.path);
       if (!target || target === d.path) continue;
       const key = `${target}::${d.path}`;
       if (hierMap.has(key)) continue;
@@ -186,7 +236,7 @@ for (const [ns, docs] of byNs) {
     let pos = 0;
     for (const b of bullets) {
       if (b.kind !== "associated") continue;
-      const target = resolve(b.target);
+      const target = resolve(b.target, d.path);
       if (!target || target === d.path) continue;
       const [lo, hi] = d.path < target ? [d.path, target] : [target, d.path];
       const key = `${lo}::${hi}`;

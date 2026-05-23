@@ -1,5 +1,6 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { pickByLocality, filenameSlug } from "./resolveLink";
 
 export type RelationKind = "hierarchy" | "assoc";
 export type Role = "parent" | "child" | "assoc";
@@ -189,16 +190,36 @@ export function buildIndexFromContents(files: { path: string; content: string }[
   // slug (last path segment without ".md"). Lets vaults that keep
   // SCREAMING-KEBAB filenames but human-friendly H1s resolve their
   // bullets to real docs without rewriting either side.
-  const titleToPath = new Map<string, string>();
-  const slugToPath = new Map<string, string>();
+  //
+  // Multi-maps because two docs can share a title or slug (e.g.
+  // SFPDI/DAY1 and GBI/DAY1). When that happens, the caller's path
+  // (`fromPath`) breaks the tie via path-locality scoring — see
+  // pickByLocality in resolveLink.ts.
+  const titleToPaths = new Map<string, string[]>();
+  const slugToPaths = new Map<string, string[]>();
   for (const d of docs) {
-    titleToPath.set(d.title.toLowerCase(), d.path);
-    const last = (d.path.split("/").pop() ?? d.path).replace(/\.md$/i, "");
-    slugToPath.set(last.toLowerCase(), d.path);
+    const titleKey = d.title.toLowerCase();
+    const slugKey = filenameSlug(d.path).toLowerCase();
+    const titleArr = titleToPaths.get(titleKey) ?? [];
+    titleArr.push(d.path);
+    titleToPaths.set(titleKey, titleArr);
+    const slugArr = slugToPaths.get(slugKey) ?? [];
+    slugArr.push(d.path);
+    slugToPaths.set(slugKey, slugArr);
   }
-  const resolve = (target: string): string | undefined => {
+  const resolve = (target: string, fromPath: string): string | undefined => {
     const t = target.toLowerCase();
-    return titleToPath.get(t) ?? slugToPath.get(t);
+    const titles = titleToPaths.get(t);
+    if (titles && titles.length > 0) {
+      if (titles.length === 1) return titles[0];
+      return pickByLocality(titles.map((path) => ({ path })), fromPath).path;
+    }
+    const slugs = slugToPaths.get(t);
+    if (slugs && slugs.length > 0) {
+      if (slugs.length === 1) return slugs[0];
+      return pickByLocality(slugs.map((path) => ({ path })), fromPath).path;
+    }
+    return undefined;
   };
 
   const seen = new Set<string>();
@@ -221,15 +242,15 @@ export function buildIndexFromContents(files: { path: string; content: string }[
 
   for (const d of docs) {
     for (const link of d.children) {
-      const childPath = resolve(link.title);
+      const childPath = resolve(link.title, d.path);
       if (childPath) pushHier(d.path, childPath);
     }
     for (const link of d.parents) {
-      const parentPath = resolve(link.title);
+      const parentPath = resolve(link.title, d.path);
       if (parentPath) pushHier(parentPath, d.path);
     }
     for (const link of d.associates) {
-      const assocPath = resolve(link.title);
+      const assocPath = resolve(link.title, d.path);
       if (assocPath) pushAssoc(d.path, assocPath);
     }
   }

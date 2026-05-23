@@ -6,17 +6,22 @@ import type { DocIndex, DocNode } from "./indexer";
  * path segment without ".md"). The filename fallback handles vaults
  * where wiki-links use the SCREAMING-KEBAB form while H1s carry a
  * human-friendly title.
+ *
+ * When two docs share the same title or slug (e.g. an SFPDI/DAY1 and a
+ * GBI/DAY1), `fromPath` disambiguates by locality — a link from
+ * `events/seminars/SFPDI.md` to `[[DAY1]]` picks the candidate sitting
+ * under `events/seminars/SFPDI/`, not its GBI cousin. Without
+ * `fromPath` we fall back to first-match (legacy behaviour).
  */
-export function resolveWikiLink(index: DocIndex, target: string): DocNode | null {
+export function resolveWikiLink(index: DocIndex, target: string, fromPath?: string): DocNode | null {
   const t = target.trim().toLowerCase();
   if (!t) return null;
-  for (const d of index.docs) {
-    if (d.title.toLowerCase() === t) return d;
-  }
-  for (const d of index.docs) {
-    const slug = filenameSlug(d.path);
-    if (slug.toLowerCase() === t) return d;
-  }
+  const titleMatches = index.docs.filter((d) => d.title.toLowerCase() === t);
+  if (titleMatches.length === 1) return titleMatches[0];
+  if (titleMatches.length > 1) return pickByLocality(titleMatches, fromPath);
+  const slugMatches = index.docs.filter((d) => filenameSlug(d.path).toLowerCase() === t);
+  if (slugMatches.length === 1) return slugMatches[0];
+  if (slugMatches.length > 1) return pickByLocality(slugMatches, fromPath);
   return null;
 }
 
@@ -38,4 +43,60 @@ export function resolvableKeysLower(docs: DocNode[]): Set<string> {
     out.add(filenameSlug(d.path).toLowerCase());
   }
   return out;
+}
+
+/**
+ * Tiered locality scoring for an ambiguous wiki-link. Higher tier wins;
+ * within a tier, shorter shared prefix loses (i.e. more shared segments
+ * is better). Falls back to first candidate if `fromPath` is missing.
+ *
+ * Tiers (from `fromPath`'s point of view):
+ *   5 — same directory as the linking doc (sibling)
+ *   4 — descendant of "fromPath as a folder" (matches the common pattern
+ *       where `SFPDI.md` indexes a sibling `SFPDI/` directory)
+ *   3 — ancestor directory of the linking doc (linking up the tree)
+ *   2 — shares any leading path segments
+ *   1 — no overlap; first match wins
+ */
+export function pickByLocality<T extends { path: string }>(candidates: T[], fromPath?: string): T {
+  if (!fromPath || candidates.length === 0) return candidates[0];
+  const fromSegs = fromPath.split("/");
+  const fromDir = fromSegs.slice(0, -1);
+  const fromBase = (fromSegs[fromSegs.length - 1] ?? "").replace(/\.md$/i, "");
+
+  let best = candidates[0];
+  let bestScore = -1;
+  for (const c of candidates) {
+    const cSegs = c.path.split("/");
+    const cDir = cSegs.slice(0, -1);
+    const shared = sharedPrefix(fromDir, cDir);
+
+    let tier = 1;
+    if (eqSegs(cDir, fromDir)) tier = 5;
+    else if (cDir.length > fromDir.length && eqSegs(cDir.slice(0, fromDir.length), fromDir) && cDir[fromDir.length] === fromBase) tier = 4;
+    else if (fromDir.length > cDir.length && eqSegs(fromDir.slice(0, cDir.length), cDir)) tier = 3;
+    else if (shared > 0) tier = 2;
+
+    // Score = tier * 1000 + shared-prefix-depth. Lets a tier-2 candidate
+    // with 4 shared segments beat a tier-2 with 2 shared segments.
+    const score = tier * 1000 + shared;
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
+  }
+  return best;
+}
+
+function eqSegs(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function sharedPrefix(a: string[], b: string[]): number {
+  const n = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < n && a[i] === b[i]) i++;
+  return i;
 }

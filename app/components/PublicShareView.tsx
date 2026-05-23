@@ -163,10 +163,10 @@ export function PublicShareView({ publication, index, isSignedIn }: Props) {
 
   const handleWikiLinkClick = useCallback(
     (title: string) => {
-      const doc = resolveWikiLink(index, title);
+      const doc = resolveWikiLink(index, title, activePath);
       if (doc) selectDoc(doc.path);
     },
-    [index, selectDoc]
+    [index, selectDoc, activePath]
   );
 
   const { prevSibling, nextSibling } = useMemo<{
