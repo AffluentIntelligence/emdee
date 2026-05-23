@@ -1,4 +1,5 @@
 import { adminClient } from "@/src/lib/supabase/admin";
+import { syncDocEdges, deleteDocEdges } from "@/src/core/syncDocEdges";
 import type { VaultFile, VaultStorage } from "./VaultStorage";
 
 const BUCKET = "vaults";
@@ -155,6 +156,12 @@ export class SupabaseStorage implements VaultStorage {
     } catch (e) {
       console.error(`vault_files cache write threw for ${filePath}:`, e);
     }
+
+    // SPRINT-018 Phase 2: keep doc_edges in sync after the cache mirror.
+    // Sync errors propagate — the bucket + cache have already committed
+    // (documented asymmetry), but a failed sync means the edges are
+    // wrong and the caller should know about it (HTTP 500).
+    await syncDocEdges(adminClient(), split.namespace, split.file_path, content);
   }
 
   async delete(filePath: string): Promise<void> {
@@ -170,6 +177,10 @@ export class SupabaseStorage implements VaultStorage {
     } catch (e) {
       console.error(`vault_files cache delete threw for ${filePath}:`, e);
     }
+
+    // SPRINT-018 Phase 2: drop every edge touching this doc. Sync errors
+    // propagate — see comment on write() above for the asymmetry note.
+    await deleteDocEdges(adminClient(), split.namespace, split.file_path);
   }
 
   async exists(filePath: string): Promise<boolean> {
