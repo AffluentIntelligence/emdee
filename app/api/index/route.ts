@@ -5,6 +5,7 @@ import type { VaultStorage } from "@/src/lib/storage";
 import { adminClient } from "@/src/lib/supabase/admin";
 import { ensureProfile } from "@/src/lib/supabase/oauth";
 import { vaultListTag } from "@/src/lib/cache/bust";
+import { backfillNamespace } from "@/src/core/syncDocEdges";
 
 // SPRINT-024 Phase 3: dropped `dynamic = "force-dynamic"` so the public
 // namespace can sit behind Vercel's edge cache. Personal namespaces are
@@ -39,6 +40,24 @@ async function seedFromPublic(storage: VaultStorage, ns: string): Promise<void> 
       await storage.write(`${ns}/${relative}`, f.content);
     })
   );
+
+  // Per-file syncDocEdges fires inside storage.write, but Promise.all
+  // races them against each other — when sync for file A runs, sibling
+  // files may not yet exist in vault_files, so cross-doc wiki-links
+  // from A fail to resolve and the corresponding edges never land.
+  // Result: a freshly-seeded namespace has docs but a partial/empty
+  // doc_edges table → flat sidebar, isolated graph nodes.
+  //
+  // Re-derive the entire namespace's edges once after the seed settles.
+  // Throws propagate so the caller (GET handler) can decide whether to
+  // proceed; the indexer's parsed edges (kept by the empty-edge guard
+  // below) cover the renderer for this single request even if backfill
+  // fails.
+  try {
+    await backfillNamespace(adminClient(), ns);
+  } catch (e) {
+    console.error(`seed backfill failed for ${ns}:`, e);
+  }
 }
 
 export async function GET(request: Request) {
@@ -128,7 +147,16 @@ export async function GET(request: Request) {
       if (data.length < PAGE_SIZE) break;
       pageStart += PAGE_SIZE;
     }
-    if (!error) {
+    // Empty-edge guard: a freshly-seeded namespace can have docs in
+    // vault_files but zero rows in doc_edges (the per-file syncDocEdges
+    // calls during seed race each other; see `seedFromPublic`). If
+    // doc_edges is empty for a non-empty vault, fall back to the
+    // indexer's parsed edges (same as local mode) so the renderer
+    // shows a real graph instead of a flat orphan list. A subsequent
+    // backfill (kicked off in seedFromPublic, or run manually via
+    // `npx tsx scripts/backfill-doc-edges.ts --namespace <ns>`) will
+    // populate doc_edges so future requests use the fast path.
+    if (!error && rows.length > 0) {
       // Assoc rows are stored once per direction in doc_edges (two rows
       // per pair); the indexer's Edge[] expects one row per pair with
       // from < to. Dedupe accordingly so the graph renderer doesn't

@@ -75,20 +75,13 @@ interface DesiredEdges {
 }
 
 /**
- * Recompute every hierarchy + assoc row in the namespace whose `from_path`
- * OR `to_path` equals `affectedPath`. This is the set of rows that could
- * have changed as a result of editing `affectedPath`. Returns rows the
- * caller will diff against the current DB state.
- *
- * Edges originating from other docs (e.g. another doc's `## Parent of`
- * still mentioning this doc) need to be evaluated against this doc's new
- * title in case it changed — that's why we re-derive all edges touching
- * affectedPath, not just edges declared in its own bullets.
+ * Derive every hierarchy + assoc row implied by `docs`. No filter applied —
+ * useful for namespace-wide backfill. The single-doc sync path wraps this
+ * with a `from_path/to_path === affectedPath` filter (see `computeDesired`).
  */
-function computeDesired(
+function computeAllEdges(
   namespace: string,
   docs: DocMeta[],
-  affectedPath: string,
 ): DesiredEdges {
   const resolve = makeResolver(docs);
   const hierMap = new Map<string, EdgeRow>();
@@ -176,10 +169,26 @@ function computeDesired(
     assocMap.set(`${b}::${a}`, { namespace, from_path: b, to_path: a, kind: "assoc", label, position });
   }
 
-  // Filter down to rows that touch affectedPath. This keeps the diff
-  // window small — we never DELETE/UPSERT a row that has nothing to do
-  // with this edit. Renames/cross-edits invalidate other rows but those
-  // are handled by their own write hooks.
+  return { hierMap, assocMap };
+}
+
+/**
+ * Recompute every hierarchy + assoc row in the namespace whose `from_path`
+ * OR `to_path` equals `affectedPath`. This is the set of rows that could
+ * have changed as a result of editing `affectedPath`. Returns rows the
+ * caller will diff against the current DB state.
+ *
+ * Edges originating from other docs (e.g. another doc's `## Parent of`
+ * still mentioning this doc) need to be evaluated against this doc's new
+ * title in case it changed — that's why we re-derive all edges touching
+ * affectedPath, not just edges declared in its own bullets.
+ */
+function computeDesired(
+  namespace: string,
+  docs: DocMeta[],
+  affectedPath: string,
+): DesiredEdges {
+  const all = computeAllEdges(namespace, docs);
   const filterTouching = <T extends EdgeRow>(map: Map<string, T>) => {
     const out = new Map<string, T>();
     for (const [k, r] of map) {
@@ -187,10 +196,9 @@ function computeDesired(
     }
     return out;
   };
-
   return {
-    hierMap: filterTouching(hierMap),
-    assocMap: filterTouching(assocMap),
+    hierMap: filterTouching(all.hierMap),
+    assocMap: filterTouching(all.assocMap),
   };
 }
 
@@ -318,6 +326,67 @@ export async function syncDocEdges(
     const { error } = await admin.from("doc_edges").upsert(toUpsert);
     if (error) throw new Error(`syncDocEdges: upsert failed: ${error.message}`);
   }
+}
+
+/**
+ * Wipe and rebuild every doc_edges row for `namespace` from the current
+ * `vault_files` snapshot. Idempotent. Use this when:
+ *
+ * - The namespace was just seeded from `public/` and per-file `syncDocEdges`
+ *   calls raced each other (parallel writes → incomplete cross-doc visibility
+ *   in vault_files → some cross-doc wiki-links never resolved at sync time).
+ * - You need to repair a namespace whose `doc_edges` looks suspiciously sparse.
+ *
+ * Uses paginated vault_files reads (Supabase enforces a 1000-row server cap)
+ * and chunked inserts (500 rows per round trip).
+ */
+export async function backfillNamespace(
+  admin: SupabaseClient,
+  namespace: string,
+): Promise<{ docs: number; rows: number }> {
+  const PAGE = 1000;
+  const docs: DocMeta[] = [];
+  let pageStart = 0;
+  while (true) {
+    const { data, error } = await admin
+      .from("vault_files")
+      .select("file_path, content")
+      .eq("namespace", namespace)
+      .range(pageStart, pageStart + PAGE - 1);
+    if (error) throw new Error(`backfillNamespace: vault_files read failed: ${error.message}`);
+    if (!data || data.length === 0) break;
+    for (const r of data) {
+      const content = (r.content as string) ?? "";
+      docs.push({
+        path: r.file_path as string,
+        title: deriveTitle(r.file_path as string, content),
+        content,
+      });
+    }
+    if (data.length < PAGE) break;
+    pageStart += PAGE;
+  }
+
+  const all = computeAllEdges(namespace, docs);
+  const edgeRows: EdgeRow[] = [...all.hierMap.values(), ...all.assocMap.values()];
+
+  // Wipe + replace. Clearing first avoids stale rows surviving the upsert
+  // when an edge no longer exists in the new doc set.
+  const { error: delErr } = await admin
+    .from("doc_edges")
+    .delete()
+    .eq("namespace", namespace);
+  if (delErr) throw new Error(`backfillNamespace: clear failed: ${delErr.message}`);
+
+  const CHUNK = 500;
+  for (let i = 0; i < edgeRows.length; i += CHUNK) {
+    const { error: insErr } = await admin
+      .from("doc_edges")
+      .upsert(edgeRows.slice(i, i + CHUNK));
+    if (insErr) throw new Error(`backfillNamespace: insert failed: ${insErr.message}`);
+  }
+
+  return { docs: docs.length, rows: edgeRows.length };
 }
 
 /**

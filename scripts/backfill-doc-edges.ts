@@ -2,7 +2,13 @@
 // shared parser + resolver from src/core/. Idempotent — wipes existing
 // rows per-namespace before re-inserting so re-running is safe.
 //
-// Run from project root: npx tsx scripts/backfill-doc-edges.ts
+// Run from project root:
+//   npx tsx scripts/backfill-doc-edges.ts              # all namespaces
+//   npx tsx scripts/backfill-doc-edges.ts --namespace=user_XXX  # one namespace
+//   npx tsx scripts/backfill-doc-edges.ts user_XXX     # positional shorthand
+//
+// Single-namespace mode is the SPRINT-028 entry point: use it to repair
+// a freshly-seeded user whose per-file syncDocEdges races dropped edges.
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
@@ -23,6 +29,11 @@ if (!url || !key) throw new Error("Missing Supabase env vars (NEXT_PUBLIC_SUPABA
 
 const sb = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 
+const nsFlag = process.argv.find((a) => a.startsWith("--namespace="))?.slice("--namespace=".length);
+const nsPositional = process.argv.slice(2).find((a) => !a.startsWith("--"));
+const filterNs: string | null = nsFlag ?? nsPositional ?? null;
+if (filterNs) console.log(`Filtering to namespace: ${filterNs}`);
+
 function deriveTitle(rel: string, content: string): string {
   for (const line of content.split(/\r?\n/)) {
     const m = line.match(/^#\s+(.*?)\s*$/);
@@ -42,11 +53,25 @@ interface EdgeRow {
 }
 
 console.log("Reading vault_files…");
-const { data: rows, error: readErr } = await sb
-  .from("vault_files")
-  .select("namespace, file_path, content");
-if (readErr) throw readErr;
-const allRows = (rows ?? []) as Array<{ namespace: string; file_path: string; content: string }>;
+// Paginate explicitly — Supabase enforces a 1000-row server-side cap that
+// .range() lifts but caller still must walk pages. Backfilling a 600+ doc
+// namespace without pagination would silently truncate.
+const PAGE = 1000;
+const allRows: Array<{ namespace: string; file_path: string; content: string }> = [];
+let pageStart = 0;
+while (true) {
+  let q = sb
+    .from("vault_files")
+    .select("namespace, file_path, content")
+    .range(pageStart, pageStart + PAGE - 1);
+  if (filterNs) q = q.eq("namespace", filterNs);
+  const { data, error: readErr } = await q;
+  if (readErr) throw readErr;
+  if (!data || data.length === 0) break;
+  allRows.push(...(data as Array<{ namespace: string; file_path: string; content: string }>));
+  if (data.length < PAGE) break;
+  pageStart += PAGE;
+}
 console.log(`Read ${allRows.length} rows across namespaces.`);
 
 const byNs = new Map<string, Array<{ path: string; content: string }>>();
