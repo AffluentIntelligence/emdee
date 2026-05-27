@@ -69,11 +69,22 @@ const PREV_SIBLING_SLOT = 1;
 const NEXT_SIBLING_SLOT = 7;
 const ROTATABLE_SLOTS_WITH_PARENT = [2, 3, 4, 5, 6];
 const ROTATABLE_SLOTS_ROOT = [0, 1, 2, 3, 4, 5, 6, 7];
-// For root focals: slot 0 is reserved as the "anchor" for the first
-// declared child (the canonical top-of-hierarchy node, e.g. VAULT under
-// EMDEE). Remaining children paginate through slots 1–7 so the anchor
-// stays pinned at 12 o'clock across every page.
+// For root focals: when a focal/anchor convention applies (see
+// ANCHOR_BY_FOCAL_TITLE), slot 0 is pinned to the anchor child and the
+// remaining children paginate through slots 1–7. Without an applicable
+// convention, root focals fall back to ROTATABLE_SLOTS_ROOT (no pin).
 const ROTATABLE_SLOTS_ROOT_WITH_ANCHOR = [1, 2, 3, 4, 5, 6, 7];
+
+// Conventional anchor pins: when the focal has a matching title AND it's
+// a root (no parent), the child with the matching title gets slot 0
+// across every page. EMDEE → VAULT is the seed-vault convention; VAULT
+// is the meta-pillar that groups INFO/INSTRUCTIONS/BRAIN/WORKFLOWS, and
+// since both docs ship with the public seed every user's vault inherits
+// this layout. Add entries here for other root/anchor pairs you want to
+// pin. Comparison is case-sensitive against the doc's H1 title.
+const ANCHOR_BY_FOCAL_TITLE: Record<string, string> = {
+  EMDEE: "VAULT",
+};
 const LAYER2_PER_LAYER1 = 2;
 const RADIUS_LAYER1 = 240;
 const RADIUS_LAYER2 = 400;
@@ -282,15 +293,26 @@ function placeLayout(
   if (prevSiblingId) siblingIds.add(prevSiblingId);
   const rotatable = all.filter((n) => n.role !== "parent" && !siblingIds.has(n.id));
 
-  // Root focals get an "anchor child": the first declared child (author's
-  // first `## Parent of` bullet) gets pinned to slot 0 (12 o'clock) across
-  // every page, mirroring the semantic role parent has for non-root focals.
-  // For an entry doc like EMDEE, this keeps VAULT visually on top even as
-  // the other top-level pillars paginate beneath it. forceBranchLayout
-  // (public-share root) opts out — that view already pins lineage slots.
+  // Root focals can get an "anchor child" pinned to slot 0 (12 o'clock)
+  // across every page. The convention is hard-coded in ANCHOR_BY_FOCAL_TITLE:
+  // currently EMDEE → VAULT, because the seed ships both docs and the
+  // semantic intent (VAULT is the meta-pillar above the content pillars)
+  // is universal across users. forceBranchLayout (public-share root)
+  // opts out — that view already pins lineage slots.
+  //
+  // Without a matching convention, root focals stay anchorless and use
+  // all 8 slots for rotatable (the original layout). We deliberately do
+  // not pin "rotatable[0]" generically: that would pin whichever child
+  // sorts first alphabetically (e.g. BUSINESS under EMDEE), which is
+  // visually arbitrary and confuses the layout's semantic meaning.
   const isRootFocal = !parent && !forceBranchLayout;
-  const anchorChild = isRootFocal && rotatable.length > 0 ? rotatable[0] : null;
-  const paginated = anchorChild ? rotatable.slice(1) : rotatable;
+  const anchorTitle = isRootFocal ? ANCHOR_BY_FOCAL_TITLE[focalTitle] : undefined;
+  const anchorChild = anchorTitle
+    ? rotatable.find((n) => titleFor(n.id) === anchorTitle) ?? null
+    : null;
+  const paginated = anchorChild
+    ? rotatable.filter((n) => n.id !== anchorChild.id)
+    : rotatable;
 
   // Rotatable nodes fill a fixed list of slot positions in declared order.
   // With a parent: only the bottom-half slots (lineage slots 0/1/7 stay
