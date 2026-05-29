@@ -456,125 +456,14 @@ export function App({ namespace }: { namespace: string }) {
     };
   }, [activeDoc, activePath, index]);
 
-  const rawDocTree = useMemo(
+  // `/api/index` returns native + shared docs in one DocIndex (SPRINT-030).
+  // Shared docs arrive with `__shared:<owner>:<path>` paths and a synthetic
+  // `SHARED.md → <shareRoot>` edge per share group, so buildDocTree puts
+  // them under SHARED naturally — no client-side graft required.
+  const docTree = useMemo(
     () => (index ? buildDocTree(index) : []),
     [index]
   );
-
-  // SHARED.md is a real doc seeded into every vault (see
-  // scripts/seed-shared-doc.mjs) — the indexer puts it under VAULT
-  // naturally. Here we attach synthetic children to it: one branch per
-  // share group, rooted at the owner's share_root and rebuilding the
-  // owner-side hierarchy from the edges we fetched. Each node carries the
-  // "__shared:<owner>:<path>" sentinel so the doc pane resolves content
-  // from the right owner namespace.
-  const docTree = useMemo<TreeNode[]>(() => {
-    if (sharedShares.length === 0) return rawDocTree;
-
-    const buildShareTree = (s: SharedShare): TreeNode | null => {
-      const docByPath = new Map(s.docs.map((d) => [d.path, d]));
-      const childrenOf = new Map<string, string[]>();
-      const hasParent = new Set<string>();
-      for (const e of s.edges) {
-        if (!docByPath.has(e.from) || !docByPath.has(e.to)) continue;
-        const arr = childrenOf.get(e.from) ?? [];
-        arr.push(e.to);
-        childrenOf.set(e.from, arr);
-        hasParent.add(e.to);
-      }
-
-      const visited = new Set<string>();
-      const walk = (p: string): TreeNode | null => {
-        if (visited.has(p)) return null;
-        visited.add(p);
-        const d = docByPath.get(p);
-        if (!d) return null;
-        const childPaths = (childrenOf.get(p) ?? []).slice().sort((a, b) => {
-          const ta = docByPath.get(a)?.title ?? a;
-          const tb = docByPath.get(b)?.title ?? b;
-          return ta.localeCompare(tb);
-        });
-        const children = childPaths
-          .map(walk)
-          .filter((n): n is TreeNode => n !== null);
-        return {
-          doc: {
-            path: sharedActiveKey(s.ownerId, d.path),
-            title: d.title,
-            content: d.content,
-            summary: "",
-            parents: [],
-            children: [],
-            associates: [],
-            mentions: [],
-          },
-          depth: 0,
-          children,
-        };
-      };
-
-      // Prefer the declared share root; if it's missing (descendants-only
-      // share), fall back to any doc without a parent within the group.
-      const rootPath = docByPath.has(s.shareRoot)
-        ? s.shareRoot
-        : s.docs.map((d) => d.path).find((p) => !hasParent.has(p)) ?? null;
-      const root = rootPath ? walk(rootPath) : null;
-
-      // Catch any docs the edges didn't cover (asymmetric data) so nothing
-      // silently disappears — they get appended as siblings of the root.
-      const orphans: TreeNode[] = [];
-      for (const d of s.docs) {
-        if (visited.has(d.path)) continue;
-        orphans.push({
-          doc: {
-            path: sharedActiveKey(s.ownerId, d.path),
-            title: d.title,
-            content: d.content,
-            summary: "",
-            parents: [],
-            children: [],
-            associates: [],
-            mentions: [],
-          },
-          depth: 0,
-          children: [],
-        });
-        visited.add(d.path);
-      }
-      if (root) {
-        if (orphans.length > 0) root.children = [...root.children, ...orphans];
-        return root;
-      }
-      // No root at all (degenerate) — fall back to a flat list.
-      return orphans.length > 0
-        ? { ...orphans[0], children: orphans.slice(1) }
-        : null;
-    };
-
-    const sharedChildren = sharedShares
-      .map(buildShareTree)
-      .filter((n): n is TreeNode => n !== null);
-
-    const attachToShared = (nodes: TreeNode[]): TreeNode[] | null => {
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        if (n.doc.title.toUpperCase() === "SHARED") {
-          const next = nodes.slice();
-          next[i] = { ...n, children: [...n.children, ...sharedChildren] };
-          return next;
-        }
-        const inChild = attachToShared(n.children);
-        if (inChild) {
-          const next = nodes.slice();
-          next[i] = { ...n, children: inChild };
-          return next;
-        }
-      }
-      return null;
-    };
-
-    return attachToShared(rawDocTree) ?? rawDocTree;
-  }, [rawDocTree, sharedShares]);
 
   // Collapse all parent nodes on first load; leave user-driven toggles alone after that.
   useEffect(() => {
@@ -642,7 +531,7 @@ export function App({ namespace }: { namespace: string }) {
       }
       return null;
     };
-    const trail = findPathTo(rawDocTree, "SHARED", []);
+    const trail = findPathTo(docTree, "SHARED", []);
     if (trail) ancestors.push(...trail);
     if (ancestors.length === 0) return;
     setCollapsed((prev) => {
@@ -650,7 +539,7 @@ export function App({ namespace }: { namespace: string }) {
       for (const p of ancestors) next.delete(p);
       return next;
     });
-  }, [sharedShares, rawDocTree]);
+  }, [sharedShares, docTree]);
 
   // Sidebar click sets the active path but preserves the current view —
   // in graph view it navigates the graph focus, in doc view it loads the doc.
