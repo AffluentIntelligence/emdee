@@ -1,11 +1,37 @@
 import { auth } from "@clerk/nextjs/server";
-import { buildIndexFromContents, type Edge } from "@/src/core/indexer";
+import { buildIndexFromContents, type DocNode, type Edge } from "@/src/core/indexer";
 import { getVaultStorage } from "@/src/lib/storage";
 import type { VaultStorage } from "@/src/lib/storage";
 import { adminClient } from "@/src/lib/supabase/admin";
 import { ensureProfile } from "@/src/lib/supabase/oauth";
 import { vaultListTag } from "@/src/lib/cache/bust";
 import { backfillNamespace } from "@/src/core/syncDocEdges";
+import { fetchSharesForGrantee } from "@/src/lib/share/grants";
+
+const SHARED_PREFIX = "__shared:";
+const SHARED_ROOT_PATH = "SHARED.md";
+const sharedKey = (ownerId: string, path: string) => `${SHARED_PREFIX}${ownerId}:${path}`;
+
+function summaryFromContent(content: string): string {
+  // First blockquote line after the H1, before the next heading. Matches the
+  // indexer's contract (src/core/indexer.ts deriveSummary) so shared docs
+  // surface a summary the same way native ones do.
+  let seenH1 = false;
+  for (const raw of content.split(/\r?\n/)) {
+    const h = raw.match(/^(#{1,6})\s+/);
+    if (h) {
+      if (!seenH1 && h[1] === "#") {
+        seenH1 = true;
+        continue;
+      }
+      if (seenH1) return "";
+    }
+    if (!seenH1) continue;
+    const bq = raw.match(/^\s*>\s?(.*)$/);
+    if (bq) return bq[1].trim();
+  }
+  return "";
+}
 
 // SPRINT-024 Phase 3: dropped `dynamic = "force-dynamic"` so the public
 // namespace can sit behind Vercel's edge cache. Personal namespaces are
@@ -181,6 +207,58 @@ export async function GET(request: Request) {
         }
       }
       index.edges = edges;
+    }
+  }
+
+  // Shared-doc merge (SPRINT-030). For authenticated personal namespaces,
+  // inline docs and edges the user has access to via `doc_shares` so the
+  // graph and sidebar agree on a single index. Public namespace
+  // short-circuits — `public` has no grantees and we don't want the share
+  // lookup polluting the edge cache.
+  if (!isLocal && ns !== "public") {
+    try {
+      const shares = await fetchSharesForGrantee(ns);
+      const hasSharedRoot = index.docs.some((d) => d.path === SHARED_ROOT_PATH);
+      for (const group of shares) {
+        const pathSet = new Set(group.docs.map((d) => d.path));
+        for (const doc of group.docs) {
+          const sharedDoc: DocNode = {
+            path: sharedKey(group.ownerId, doc.path),
+            title: doc.title,
+            content: doc.content,
+            summary: summaryFromContent(doc.content),
+            parents: [],
+            children: [],
+            associates: [],
+            mentions: [],
+          };
+          index.docs.push(sharedDoc);
+        }
+        for (const e of group.edges) {
+          if (!pathSet.has(e.from) || !pathSet.has(e.to)) continue;
+          index.edges.push({
+            from: sharedKey(group.ownerId, e.from),
+            to: sharedKey(group.ownerId, e.to),
+            kind: "hierarchy",
+          });
+        }
+        // One synthetic edge per share group anchoring the share root to the
+        // user's own SHARED.md so the graph can walk SHARED → shared
+        // subtree. Skipped if SHARED.md isn't in this user's vault for any
+        // reason (seed should always have placed it; defensive only).
+        if (hasSharedRoot && pathSet.has(group.shareRoot)) {
+          index.edges.push({
+            from: SHARED_ROOT_PATH,
+            to: sharedKey(group.ownerId, group.shareRoot),
+            kind: "hierarchy",
+          });
+        }
+      }
+    } catch (e) {
+      // Don't fail the whole index fetch if share lookup explodes. The
+      // sidebar's separate `/api/shared` call still provides a fallback
+      // surface for the user even if their graph misses the share branch.
+      console.error(`shared-doc merge failed for ${ns}:`, e);
     }
   }
 
