@@ -54,6 +54,47 @@ async function hasShareAccess(granteeId: string, ownerId: string, relPath: strin
 }
 
 /**
+ * Direct match OR ancestor match for `permission='write'`. Ancestor walk
+ * uses path conventions (cascade-by-hierarchy): write on
+ * `projects/DOUBLELEAD.md` covers `projects/DOUBLELEAD/IDEAS/NewIdea.md`.
+ * The strict-ancestor form (`<parts>/...md`) avoids cross-prefix false
+ * positives like `DOUBLELEAD-OFFSHOOT.md`.
+ */
+async function isWritableSharedPath(
+  granteeId: string,
+  ownerId: string,
+  relPath: string,
+): Promise<boolean> {
+  const admin = adminClient();
+
+  const { data: direct } = await admin
+    .from("doc_shares")
+    .select("id")
+    .eq("grantee_id", granteeId)
+    .eq("owner_id", ownerId)
+    .eq("path_prefix", relPath)
+    .eq("permission", "write")
+    .maybeSingle();
+  if (direct) return true;
+
+  const parts = relPath.split("/");
+  const candidates: string[] = [];
+  for (let i = parts.length - 1; i > 0; i--) {
+    candidates.push(parts.slice(0, i).join("/") + ".md");
+  }
+  if (candidates.length === 0) return false;
+
+  const { data: anc } = await admin
+    .from("doc_shares")
+    .select("path_prefix")
+    .eq("grantee_id", granteeId)
+    .eq("owner_id", ownerId)
+    .eq("permission", "write")
+    .in("path_prefix", candidates);
+  return (anc?.length ?? 0) > 0;
+}
+
+/**
  * Per-request memo. SPRINT-024 Phase 2: a single MCP session often issues
  * multiple read tool calls (get_doc → get_neighbors → read_doc_section …)
  * each of which historically re-built the index. The memo collapses those
@@ -141,8 +182,21 @@ export async function readVaultFile(ctx: ToolContext, rel: string): Promise<stri
 }
 
 export async function writeVaultFile(ctx: ToolContext, rel: string, content: string): Promise<void> {
-  if (rel.startsWith(SHARED_PATH_PREFIX)) {
-    throw new Error("shared docs are read-only — ask the owner to make the edit");
+  const shared = parseSharedPath(rel);
+  if (shared) {
+    if (ctx.mode === "local") {
+      throw new Error("shared paths not available in local mode");
+    }
+    const allowed = await isWritableSharedPath(ctx.userId, shared.ownerId, shared.relPath);
+    if (!allowed) {
+      throw new Error("shared docs are read-only for you — ask the owner to grant write access or make the edit");
+    }
+    try {
+      await ctx.storage.write(`${shared.ownerId}/${shared.relPath}`, content);
+    } finally {
+      invalidateIndexMemo(ctx);
+    }
+    return;
   }
   try {
     if (ctx.mode === "local") {
