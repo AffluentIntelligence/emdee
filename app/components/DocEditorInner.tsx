@@ -31,6 +31,12 @@ export function DocEditorInner({ path, initialContent, mode, onChange, onWikiLin
       initialEditType: "markdown",
       hideModeSwitch: true,
       usageStatistics: false,
+      // GFM extended autolink: bare URLs typed without [text](url) syntax
+      // render as clickable <a>. ToastMark runs autolink before the text
+      // node is emitted, so the customHTMLRenderer.text override below
+      // never sees URL-shaped text (wiki-links unaffected — they don't
+      // match URL patterns).
+      extendedAutolinks: true,
       toolbarItems: [
         ["heading", "bold", "italic", "strike"],
         ["hr", "quote"],
