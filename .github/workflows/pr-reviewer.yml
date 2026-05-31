@@ -12,6 +12,7 @@ on:
 permissions:
   contents: read          # bump to write only if you opt into the inline-screenshot upgrade (see bottom)
   pull-requests: write    # post the review comment
+  id-token: write        # claude-code-action authenticates via OIDC — required
 
 concurrency:
   group: pr-reviewer-${{ github.event.pull_request.number }}
@@ -83,19 +84,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # TUNE: this polls the GitHub Deployments API for the preview's environment_url.
-          # On the first real PR, check the actual deployment payload and adjust the jq filter
-          # to whatever environment name your Vercel project uses.
+          SHA="${{ github.event.pull_request.head.sha }}"
+          REPO="${{ github.repository }}"
           URL=""
-          for i in $(seq 1 40); do
-            DEP=$(gh api "repos/${{ github.repository }}/commits/${{ github.event.pull_request.head.sha }}/deployments" --jq '.[0].id' 2>/dev/null || true)
-            if [ -n "$DEP" ] && [ "$DEP" != "null" ]; then
-              URL=$(gh api "repos/${{ github.repository }}/deployments/$DEP/statuses" --jq '[.[] | select(.state=="success")][0].environment_url' 2>/dev/null || true)
-              if [ -n "$URL" ] && [ "$URL" != "null" ]; then break; fi
-            fi
-            sleep 15
+          for i in $(seq 1 24); do   # ~4 min ceiling
+            for ID in $(gh api "repos/$REPO/deployments?sha=$SHA&per_page=100" --jq '.[].id' 2>/dev/null); do
+              U=$(gh api "repos/$REPO/deployments/$ID/statuses?per_page=100" \
+                --jq 'map(select(.state=="success" and .environment_url != null)) | (.[0].environment_url // empty)' 2>/dev/null)
+              if [ -n "$U" ]; then URL="$U"; break; fi
+            done
+            [ -n "$URL" ] && break
+            sleep 10
           done
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          [ -z "$URL" ] && echo "::warning::No preview URL via Deployments API — verify the payload."
 
       - name: Screenshot preview
         if: steps.preview.outputs.url != '' && steps.preview.outputs.url != 'null'
