@@ -39,19 +39,38 @@ export function useMcpActivity(
 
   useEffect(() => {
     if (!namespace || namespace === "public") return;
-    const es = new EventSource(
-      `/api/mcp-activity?ns=${encodeURIComponent(namespace)}`,
-    );
-    es.onmessage = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.data) as McpActivityEvent;
-        onEventRef.current(parsed);
-      } catch {
-        // Malformed payload — drop it. Pulse fidelity isn't worth a throw.
+    // SPRINT-037: only hold the SSE connection open while the tab is
+    // visible. The server-side poll loop runs every POLL_INTERVAL_MS as
+    // long as the stream is connected; closing the EventSource when the
+    // tab goes hidden stops that polling. Reopens on visibility-restore.
+    let es: EventSource | null = null;
+    const open = () => {
+      if (es) return;
+      es = new EventSource(`/api/mcp-activity?ns=${encodeURIComponent(namespace)}`);
+      es.onmessage = (ev) => {
+        try {
+          const parsed = JSON.parse(ev.data) as McpActivityEvent;
+          onEventRef.current(parsed);
+        } catch {
+          // Malformed payload — drop it. Pulse fidelity isn't worth a throw.
+        }
+      };
+    };
+    const close = () => {
+      if (es) {
+        es.close();
+        es = null;
       }
     };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") open();
+      else close();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    if (document.visibilityState === "visible") open();
     return () => {
-      es.close();
+      document.removeEventListener("visibilitychange", onVisibility);
+      close();
     };
   }, [namespace]);
 }

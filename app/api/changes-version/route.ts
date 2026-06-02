@@ -49,9 +49,21 @@ export async function GET(request: Request) {
       updated_at: f.updatedAt,
     }));
     const version = docs.reduce((max, d) => (d.updated_at > max ? d.updated_at : max), "");
+    // SPRINT-037: ETag = `"${count}-${maxUpdatedAt}"`. Captures add/delete
+    // (count moves), any edit (max ts moves), and rename (rename touches
+    // updated_at). When the client sends a matching If-None-Match,
+    // return 304 with no body — saves ~99% of polling payload bytes
+    // since almost every poll confirms "nothing changed".
+    const etag = `"${docs.length}-${version || "empty"}"`;
+    if (request.headers.get("if-none-match") === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: { ETag: etag, "Cache-Control": "no-store" },
+      });
+    }
     return Response.json(
       { version: version || null, docs },
-      { headers: { "Cache-Control": "no-store" } },
+      { headers: { "Cache-Control": "no-store", ETag: etag } },
     );
   } catch {
     return Response.json(
