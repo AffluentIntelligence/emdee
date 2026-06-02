@@ -10,11 +10,18 @@ export const runtime = "nodejs";
 // close the stream cleanly before the runtime kills it.
 export const maxDuration = 60;
 
-const POLL_INTERVAL_MS = 1200;
-// Cap: how far back we look on the very first poll. The pulse is 2s
-// long; surfacing rows much older than that would just flash stale
-// events at a freshly-mounted client.
-const INITIAL_LOOKBACK_MS = 3000;
+// SPRINT-037: was 1200ms — every active SSE connection produced ~3000
+// Postgres polls per hour, dominating API Gateway traffic post-SPRINT-035.
+// At 5s, latency for surfacing a tool-call to the activity feed goes
+// from ~1.2s p99 to ~5s p99 — acceptable for a peripheral pulse
+// indicator. Combined with the visibilitychange close-on-hidden in
+// useMcpActivity, idle background tabs now produce zero polls.
+const POLL_INTERVAL_MS = 5000;
+// Cap: how far back we look on the very first poll. Bumped a bit so a
+// freshly-reopened stream (e.g. tab brought back from hidden) doesn't
+// miss events that landed during the last few poll-windows of the
+// previous stream.
+const INITIAL_LOOKBACK_MS = 10_000;
 // Safety: end the stream after this long so Vercel's serverless function
 // timeout doesn't kill it mid-write. The EventSource on the client
 // reconnects automatically.

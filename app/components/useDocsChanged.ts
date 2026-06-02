@@ -37,13 +37,25 @@ export function useDocsChanged(namespace: string, onChanged: () => void) {
     let stamps: Map<string, string> | null = null;
     let cancelled = false;
     let timer: number | null = null;
+    // SPRINT-037: cache the last seen ETag so we can short-circuit
+    // "nothing changed" polls to a 304 with no body.
+    let etag: string | null = null;
 
     const poll = async () => {
       try {
         const res = await fetch(
           `/api/changes-version?ns=${encodeURIComponent(namespace)}`,
-          { cache: "no-store" },
+          {
+            cache: "no-store",
+            headers: etag ? { "If-None-Match": etag } : {},
+          },
         );
+        const responseEtag = res.headers.get("etag");
+        if (responseEtag) etag = responseEtag;
+        // 304 = nothing changed since last poll. No body to parse,
+        // no diff to compute. Stamps stay as-is, onChanged doesn't
+        // fire. This is the common case and the egress win.
+        if (res.status === 304) return;
         if (!res.ok) return;
         const { docs } = (await res.json()) as { version: string | null; docs: DocStamp[] };
         if (cancelled) return;
