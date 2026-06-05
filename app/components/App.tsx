@@ -445,14 +445,35 @@ export function App({ namespace }: { namespace: string }) {
     prevSibling: DocNode | null;
     nextSibling: DocNode | null;
   }>(() => {
-    if (!activeDoc || !index || activePath?.startsWith(SHARED_PREFIX)) {
-      return { prevSibling: null, nextSibling: null };
-    }
-    const { prevPath, nextPath } = getPrevNextSiblings(index, activeDoc.path);
+    if (!activeDoc || !index) return { prevSibling: null, nextSibling: null };
     const byPath = new Map(index.docs.map((d) => [d.path, d]));
+
+    if (!activePath?.startsWith(SHARED_PREFIX)) {
+      const { prevPath, nextPath } = getPrevNextSiblings(index, activeDoc.path);
+      return {
+        prevSibling: prevPath ? byPath.get(prevPath) ?? null : null,
+        nextSibling: nextPath ? byPath.get(nextPath) ?? null : null,
+      };
+    }
+
+    // Shared docs have empty .parents/.children arrays (built synthetically in
+    // the index route), so getPrevNextSiblings doesn't work. Derive siblings
+    // from index.edges instead: find the hierarchy parent, then collect all
+    // children of that parent and sort by title.
+    const parentEdge = index.edges.find(
+      (e) => e.kind === "hierarchy" && e.to === activePath
+    );
+    if (!parentEdge) return { prevSibling: null, nextSibling: null };
+    const siblings = index.edges
+      .filter((e) => e.kind === "hierarchy" && e.from === parentEdge.from)
+      .map((e) => byPath.get(e.to))
+      .filter((d): d is DocNode => !!d)
+      .sort((a, b) => a.title.toLowerCase().localeCompare(b.title.toLowerCase()));
+    const idx = siblings.findIndex((d) => d.path === activePath);
+    if (idx === -1) return { prevSibling: null, nextSibling: null };
     return {
-      prevSibling: prevPath ? byPath.get(prevPath) ?? null : null,
-      nextSibling: nextPath ? byPath.get(nextPath) ?? null : null,
+      prevSibling: siblings[idx - 1] ?? null,
+      nextSibling: siblings[idx + 1] ?? null,
     };
   }, [activeDoc, activePath, index]);
 

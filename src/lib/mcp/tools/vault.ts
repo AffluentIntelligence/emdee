@@ -130,21 +130,43 @@ async function propagateShareToNewPath(
 ): Promise<void> {
   const admin = adminClient();
 
-  // 1. Which ancestor share_roots authorised this write?
+  // 1. Which share_roots authorised this write?
+  // First try ancestor-level matches (e.g. DOUBLELEAD.md covers DOUBLELEAD/**).
+  // If that finds nothing, fall back to sibling-directory: the share root lives
+  // at the same folder level as the new file (e.g. signals/SIGNALS.md is the
+  // root for signals/SIG-009.md). Without this fallback, propagation silently
+  // fails for the common case where the root is an index file in a sub-folder.
   const parts = newPath.split("/");
   const candidates: string[] = [];
   for (let i = parts.length - 1; i > 0; i--) {
     candidates.push(parts.slice(0, i).join("/") + ".md");
   }
-  if (candidates.length === 0) return;
 
-  const { data: authRows } = await admin
-    .from("doc_shares")
-    .select("share_root")
-    .eq("owner_id", ownerId)
-    .eq("grantee_id", writerGranteeId)
-    .eq("permission", "write")
-    .in("path_prefix", candidates);
+  let authRows: { share_root: string | null }[] | null = null;
+  if (candidates.length > 0) {
+    const { data } = await admin
+      .from("doc_shares")
+      .select("share_root")
+      .eq("owner_id", ownerId)
+      .eq("grantee_id", writerGranteeId)
+      .eq("permission", "write")
+      .in("path_prefix", candidates);
+    authRows = data;
+  }
+
+  if (!authRows || authRows.length === 0) {
+    const dir = parts.slice(0, -1).join("/");
+    if (!dir) return;
+    const { data: sibData } = await admin
+      .from("doc_shares")
+      .select("share_root")
+      .eq("owner_id", ownerId)
+      .eq("grantee_id", writerGranteeId)
+      .eq("permission", "write")
+      .like("path_prefix", `${dir}/%`);
+    authRows = sibData;
+  }
+
   if (!authRows || authRows.length === 0) return;
 
   const shareRoots = [
