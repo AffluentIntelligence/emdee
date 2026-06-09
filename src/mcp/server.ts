@@ -256,15 +256,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "upload_image",
       description:
-        "Upload an image to your vault and create a vault doc with an AI-generated description. Pass the image as base64-encoded image_data. Cloud mode only — returns an error in local/stdio mode.",
+        "Store an image from the conversation into the vault. You (Claude) already see the image — describe it yourself and pass the description here. Cloud mode only.",
       inputSchema: {
         type: "object",
         properties: {
           image_data: { type: "string", description: "Base64-encoded image bytes." },
           media_type: { type: "string", enum: ["image/jpeg", "image/png", "image/gif", "image/webp"] },
+          description: { type: "string", description: "Your description of the image — what is shown, any visible text, context." },
           title: { type: "string", description: "Title for the vault doc." },
           path: { type: "string", description: "Vault path for the created doc." },
-          describe: { type: "boolean", description: "Generate an AI description. Default true." },
         },
         required: ["image_data", "media_type"],
       },
