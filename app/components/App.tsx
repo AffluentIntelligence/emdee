@@ -156,6 +156,11 @@ export function App({ namespace }: { namespace: string }) {
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+  const [imageUploadFile, setImageUploadFile] = useState<File | null>(null);
+  const [imageUploadMode, setImageUploadMode] = useState<"hub" | "focal">("hub");
+  const [imageUploadBusy, setImageUploadBusy] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const docLog = useDocLog(namespace);
   const prevContentRef = useRef<Map<string, string>>(new Map());
   const loggedInSession = useRef<Set<string>>(new Set());
@@ -779,6 +784,56 @@ export function App({ namespace }: { namespace: string }) {
     docLog.remove(entry.id);
   }, [namespace, loadIndex, docLog]);
 
+  function handleDragOver(e: React.DragEvent) {
+    if (!isOwnNamespace) return;
+    e.preventDefault();
+    setDragActive(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragActive(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragActive(false);
+    if (!isOwnNamespace) return;
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    setImageUploadFile(file);
+    setImageUploadMode("hub");
+    setImageUploadError(null);
+  }
+
+  async function submitImageUpload() {
+    if (!imageUploadFile || imageUploadBusy) return;
+    setImageUploadBusy(true);
+    setImageUploadError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", imageUploadFile);
+      if (imageUploadMode === "focal" && activePath) {
+        fd.append("associatePath", activePath);
+      }
+      const res = await fetch("/api/image", { method: "POST", body: fd });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setImageUploadError(body.error ?? "Upload failed");
+        return;
+      }
+      const { doc_path } = await res.json() as { doc_path: string };
+      setImageUploadFile(null);
+      await loadIndex(true);
+      setActivePath(doc_path);
+    } catch {
+      setImageUploadError("Upload failed");
+    } finally {
+      setImageUploadBusy(false);
+    }
+  }
+
   const openAddChild = useCallback((focalPath: string, focalTitle: string) => {
     setAddChildCtx({ focalPath, focalTitle });
     setAddChildTitle("");
@@ -1159,7 +1214,17 @@ export function App({ namespace }: { namespace: string }) {
           {sidebarCollapsed ? "›" : "‹"}
         </button>
       </div>
-      <main className="content">
+      <main
+        className="content"
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {dragActive && (
+          <div className="drag-overlay" aria-hidden="true">
+            <span className="drag-overlay-label">Drop image here</span>
+          </div>
+        )}
         {view === "main" && (
           <div
             className="main-split"
@@ -1604,6 +1669,48 @@ export function App({ namespace }: { namespace: string }) {
             </div>
             <div className="modal-actions">
               <button className="btn-ghost" onClick={() => setConflictModalOpen(false)} type="button">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image upload modal */}
+      {imageUploadFile && (
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && !imageUploadBusy && setImageUploadFile(null)}>
+          <div className="modal" role="dialog" aria-modal="true">
+            <p className="modal-title">Upload image</p>
+            <p className="modal-subtitle">{imageUploadFile.name}</p>
+            <div className="modal-field">
+              <label className="modal-label">Destination</label>
+              <div className="modal-radio-group">
+                <label className="modal-radio-option">
+                  <input
+                    type="radio"
+                    name="image-dest"
+                    checked={imageUploadMode === "hub"}
+                    onChange={() => setImageUploadMode("hub")}
+                  />
+                  Images library
+                </label>
+                {activePath && activeDoc && (
+                  <label className="modal-radio-option">
+                    <input
+                      type="radio"
+                      name="image-dest"
+                      checked={imageUploadMode === "focal"}
+                      onChange={() => setImageUploadMode("focal")}
+                    />
+                    Also link to <strong>{activeDoc.title}</strong>
+                  </label>
+                )}
+              </div>
+            </div>
+            {imageUploadError && <p className="modal-error">{imageUploadError}</p>}
+            <div className="modal-actions">
+              <button className="btn-ghost" onClick={() => setImageUploadFile(null)} type="button" disabled={imageUploadBusy}>Cancel</button>
+              <button className="btn-primary" onClick={submitImageUpload} disabled={imageUploadBusy} type="button">
+                {imageUploadBusy ? "Uploading…" : "Upload"}
+              </button>
             </div>
           </div>
         </div>
