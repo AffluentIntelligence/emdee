@@ -1003,7 +1003,7 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
     }
     const l = placeLayout(index, focalId, page, forceBranchLayout);
     for (const nd of l.nodes) {
-      if (!nd.id.startsWith("images/")) continue;
+      if (!nd.id.startsWith("images/") || nd.id === "images/IMAGES.md") continue;
       nd.isImageDoc = true;
       const doc = index.docs.find((d) => d.path === nd.id);
       const m = doc?.content?.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
@@ -1016,6 +1016,27 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
     const cy = cyRef.current;
     if (!cy || !layout) return;
     syncGraph(cy, layout);
+  }, [layout]);
+
+  // Async-load image dimensions so portrait nodes are taller than landscape.
+  useEffect(() => {
+    if (!layout) return;
+    const imageNodes = layout.nodes.filter((nd) => nd.imageUrl);
+    if (!imageNodes.length) return;
+    const MAX = 96, MIN = 48;
+    imageNodes.forEach((nd) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const node = cyRef.current?.getElementById(nd.id);
+        if (!node || node.empty()) return;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        let w: number, h: number;
+        if (ratio >= 1) { w = MAX; h = Math.max(MIN, Math.round(MAX / ratio)); }
+        else { h = MAX; w = Math.max(MIN, Math.round(MAX * ratio)); }
+        node.style({ width: w, height: h });
+      };
+      img.src = nd.imageUrl!;
+    });
   }, [layout]);
 
   // SPRINT-021: pulse matching nodes whenever the activity queue grows.

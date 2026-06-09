@@ -395,6 +395,44 @@ export function App({ namespace }: { namespace: string }) {
 
   useEffect(() => {
     if (!isOwnNamespace) return;
+    let dragCounter = 0;
+    function onDragEnter(e: DragEvent) {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      dragCounter++;
+      setDragActive(true);
+    }
+    function onDragOver(e: DragEvent) {
+      if (!e.dataTransfer?.types.includes("Files")) return;
+      e.preventDefault();
+    }
+    function onDragLeave() {
+      dragCounter--;
+      if (dragCounter <= 0) { dragCounter = 0; setDragActive(false); }
+    }
+    function onDrop(e: DragEvent) {
+      e.preventDefault();
+      dragCounter = 0;
+      setDragActive(false);
+      const file = e.dataTransfer?.files[0];
+      if (!file || !file.type.startsWith("image/")) return;
+      setImageUploadFile(file);
+      setImageUploadMode("hub");
+      setImageUploadError(null);
+    }
+    document.addEventListener("dragenter", onDragEnter);
+    document.addEventListener("dragover", onDragOver);
+    document.addEventListener("dragleave", onDragLeave);
+    document.addEventListener("drop", onDrop);
+    return () => {
+      document.removeEventListener("dragenter", onDragEnter);
+      document.removeEventListener("dragover", onDragOver);
+      document.removeEventListener("dragleave", onDragLeave);
+      document.removeEventListener("drop", onDrop);
+    };
+  }, [isOwnNamespace]);
+
+  useEffect(() => {
+    if (!isOwnNamespace) return;
     function handlePaste(e: ClipboardEvent) {
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -805,28 +843,6 @@ export function App({ namespace }: { namespace: string }) {
     docLog.remove(entry.id);
   }, [namespace, loadIndex, docLog]);
 
-  function handleDragOver(e: React.DragEvent) {
-    if (!isOwnNamespace) return;
-    e.preventDefault();
-    setDragActive(true);
-  }
-
-  function handleDragLeave(e: React.DragEvent) {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setDragActive(false);
-    }
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragActive(false);
-    if (!isOwnNamespace) return;
-    const file = e.dataTransfer.files[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    setImageUploadFile(file);
-    setImageUploadMode("hub");
-    setImageUploadError(null);
-  }
 
   async function submitImageUpload() {
     if (!imageUploadFile || imageUploadBusy) return;
@@ -1235,12 +1251,7 @@ export function App({ namespace }: { namespace: string }) {
           {sidebarCollapsed ? "›" : "‹"}
         </button>
       </div>
-      <main
-        className="content"
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
+      <main className="content">
         {dragActive && (
           <div className="drag-overlay" aria-hidden="true">
             <span className="drag-overlay-label">Drop image here</span>
