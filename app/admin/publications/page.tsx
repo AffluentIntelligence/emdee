@@ -165,9 +165,5 @@ export default async function AdminPublicationsPage() {
     subscribe_total: allEvents.filter((e) => e.event_type === "subscribe_click").length,
   };
 
-  return (
-    <div style={{ minHeight: "100dvh", background: "var(--bg)" }}>
-      <AdminPublicationsView aggregates={aggregates} totals={totals} />
-    </div>
-  );
+  return <AdminPublicationsView aggregates={aggregates} totals={totals} />;
 }

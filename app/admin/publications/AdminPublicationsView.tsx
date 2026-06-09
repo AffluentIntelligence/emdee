@@ -47,20 +47,6 @@ export function AdminPublicationsView({ aggregates, totals }: Props) {
 
   return (
     <div className="admin-root">
-      <header className="admin-header">
-        <div className="admin-header-left">
-          <Link href="/" className="admin-logo">
-            <span className="admin-logo-dot" />
-            EMDEE
-          </Link>
-          <span className="admin-header-sep">·</span>
-          <span className="admin-header-title">Admin / Publications</span>
-        </div>
-        <div className="admin-header-right">
-          <Link href="/" className="admin-header-link">← Back to vault</Link>
-        </div>
-      </header>
-
       <section className="admin-totals">
         <Stat label="Publications" value={totals.publications} />
         <Stat label="Views (24h)" value={totals.views_24h} accent />

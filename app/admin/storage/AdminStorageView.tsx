@@ -34,67 +34,56 @@ function fmtRelative(iso: string | null): string {
 
 export function AdminStorageView({ aggregates, totals }: Props) {
   return (
-    <div style={{ maxWidth: 900, margin: "0 auto", padding: "40px 24px", fontFamily: "var(--font-sans)", color: "var(--fg)" }}>
-      <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 4 }}>Storage</h1>
-      <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 32 }}>
-        Text storage per user — 5 GB limit (all tiers).
-      </p>
+    <div className="admin-root">
+      <section className="admin-totals">
+        <div className="admin-stat"><div className="admin-stat-value">{totals.user_count}</div><div className="admin-stat-label">Users</div></div>
+        <div className="admin-stat"><div className="admin-stat-value">{totals.total_docs.toLocaleString()}</div><div className="admin-stat-label">Total docs</div></div>
+        <div className="admin-stat"><div className="admin-stat-value">{fmtBytes(totals.total_bytes)}</div><div className="admin-stat-label">Total stored</div></div>
+      </section>
 
-      <div style={{ display: "flex", gap: 24, marginBottom: 40 }}>
-        {[
-          { label: "Users", value: totals.user_count },
-          { label: "Total docs", value: totals.total_docs.toLocaleString() },
-          { label: "Total stored", value: fmtBytes(totals.total_bytes) },
-        ].map(({ label, value }) => (
-          <div key={label} style={{ background: "var(--surface)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius)", padding: "16px 20px", minWidth: 130 }}>
-            <div style={{ fontSize: 22, fontWeight: 600 }}>{value}</div>
-            <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{label}</div>
-          </div>
-        ))}
-      </div>
-
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-        <thead>
-          <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--muted)" }}>
-            <th style={{ textAlign: "left", padding: "8px 12px 8px 0", fontWeight: 500 }}>User</th>
-            <th style={{ textAlign: "right", padding: "8px 12px", fontWeight: 500 }}>Docs</th>
-            <th style={{ textAlign: "left", padding: "8px 0 8px 12px", fontWeight: 500, minWidth: 200 }}>Storage used</th>
-            <th style={{ textAlign: "right", padding: "8px 0", fontWeight: 500 }}>Last write</th>
-          </tr>
-        </thead>
-        <tbody>
-          {aggregates.map((a) => (
-            <tr key={a.namespace} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-              <td style={{ padding: "10px 12px 10px 0" }}>
-                <div style={{ fontWeight: 500 }}>{a.handle}</div>
-                {a.email && <div style={{ color: "var(--muted)", fontSize: 11, marginTop: 1 }}>{a.email}</div>}
-              </td>
-              <td style={{ textAlign: "right", padding: "10px 12px", color: "var(--muted)" }}>
-                {a.doc_count.toLocaleString()}
-              </td>
-              <td style={{ padding: "10px 0 10px 12px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ flex: 1, height: 6, background: "var(--border-subtle)", borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{
-                      height: "100%",
-                      width: `${Math.min(100, a.text_pct * 100).toFixed(2)}%`,
-                      background: a.text_pct > 0.9 ? "var(--error, #e05)" : a.text_pct > 0.7 ? "#f59e0b" : "var(--accent)",
-                      borderRadius: 3,
-                      minWidth: a.bytes_used > 0 ? 3 : 0,
-                    }} />
-                  </div>
-                  <span style={{ whiteSpace: "nowrap", minWidth: 90, color: "var(--muted)" }}>
-                    {fmtBytes(a.bytes_used)} / 5 GB
-                  </span>
-                </div>
-              </td>
-              <td style={{ textAlign: "right", padding: "10px 0", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                {fmtRelative(a.last_write)}
-              </td>
+      <section className="admin-table-wrap">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th className="num">Docs</th>
+              <th>Storage used</th>
+              <th>Last write</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {aggregates.length === 0 && (
+              <tr><td colSpan={4} className="admin-empty">No data yet.</td></tr>
+            )}
+            {aggregates.map((a) => (
+              <tr key={a.namespace}>
+                <td>
+                  <div>{a.handle.startsWith("@") ? a.handle : `@${a.handle}`}</div>
+                  {a.email && <div className="admin-sub">{a.email}</div>}
+                </td>
+                <td className="num">{a.doc_count.toLocaleString()}</td>
+                <td>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 220 }}>
+                    <div style={{ flex: 1, height: 6, background: "var(--border-subtle)", borderRadius: 3, overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%",
+                        width: `${Math.min(100, a.text_pct * 100).toFixed(2)}%`,
+                        background: a.text_pct > 0.9 ? "#ef4444" : a.text_pct > 0.7 ? "#f59e0b" : "var(--accent)",
+                        borderRadius: 3,
+                        minWidth: a.bytes_used > 0 ? 3 : 0,
+                      }} />
+                    </div>
+                    <span style={{ whiteSpace: "nowrap", minWidth: 100, fontSize: 12, color: "var(--muted)" }}>
+                      {fmtBytes(a.bytes_used)} / 5 GB
+                    </span>
+                  </div>
+                </td>
+                <td>{fmtRelative(a.last_write)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
     </div>
   );
 }

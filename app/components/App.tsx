@@ -1086,33 +1086,18 @@ export function App({ namespace }: { namespace: string }) {
           />
           <div className="sidebar-footer">
             {isAdmin && (
-              <>
-                <a
-                  className="sidebar-footer-btn"
-                  href="/admin/publications"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                    <path d="M6.5 1.5L10.5 3V6.5C10.5 8.5 8.7 10.4 6.5 11C4.3 10.4 2.5 8.5 2.5 6.5V3L6.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-                    <path d="M5 6.5L6 7.5L8.5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  Admin
-                </a>
-                <a
-                  className="sidebar-footer-btn"
-                  href="/admin/storage"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                    <rect x="2" y="2" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M2 5.5H11" stroke="currentColor" strokeWidth="1.2"/>
-                    <path d="M5.5 5.5V11" stroke="currentColor" strokeWidth="1.2"/>
-                  </svg>
-                  Storage
-                </a>
-              </>
+              <a
+                className="sidebar-footer-btn"
+                href="/admin"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                  <path d="M6.5 1.5L10.5 3V6.5C10.5 8.5 8.7 10.4 6.5 11C4.3 10.4 2.5 8.5 2.5 6.5V3L6.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+                  <path d="M5 6.5L6 7.5L8.5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Admin
+              </a>
             )}
             {storagePct !== null && (
               <div className="sidebar-storage">

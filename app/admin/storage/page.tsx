@@ -86,9 +86,5 @@ export default async function AdminStoragePage() {
     total_bytes: aggregates.reduce((s, a) => s + a.bytes_used, 0),
   };
 
-  return (
-    <div style={{ minHeight: "100dvh", background: "var(--bg)" }}>
-      <AdminStorageView aggregates={aggregates} totals={totals} />
-    </div>
-  );
+  return <AdminStorageView aggregates={aggregates} totals={totals} />;
 }
