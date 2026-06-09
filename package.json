@@ -21,6 +21,7 @@
     "src/mcp"
   ],
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.102.0",
     "@clerk/nextjs": "^7.3.3",
     "@modelcontextprotocol/sdk": "^1.0.4",
     "@sparticuz/chromium": "^149.0.0",

@@ -57,6 +57,7 @@ Grounded rules an autonomous agent must never break. Each cites where it comes f
    - `SUPABASE_SERVICE_ROLE_KEY` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_URL`
    - `BLOB_READ_WRITE_TOKEN`
    - `EMDEE_DOCS`
+   - `ANTHROPIC_API_KEY` — required for `upload_image` auto-description (Claude Vision); tool skips description gracefully if unset
    `.gitignore` already excludes `.env*` — never `git add` an env file or hardcode any of these strings.
 4. **Migration discipline.** Every schema change lives in a new file under `supabase/migrations/YYYYMMDDHHMMSS_<name>.sql` — never edit a shipped migration in place. Migrations are applied via the Supabase MCP `apply_migration` or the CLI; do not rewrite tables ad-hoc.
 5. **Never run destructive DB ops without explicit ask** — `DROP TABLE`, `TRUNCATE`, mass `DELETE` without a `WHERE`. For pg_cron / RLS / extension changes, check `list_extensions` / `get_advisors` first.
