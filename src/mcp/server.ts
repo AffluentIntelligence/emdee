@@ -20,7 +20,7 @@ import {
   writeDoc,
   createChild,
   addAssociation,
-  uploadImage,
+  getImage,
 } from "../lib/mcp/tools/index.js";
 import type { ToolContext } from "../lib/mcp/tools/types.js";
 // SPRINT-021: this stdio entrypoint is hardcoded to local mode (no
@@ -254,19 +254,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
-      name: "upload_image",
+      name: "get_image",
       description:
-        "Store an image from the conversation into the vault. You (Claude) already see the image — describe it yourself and pass the description here. Cloud mode only.",
+        "Fetch an image from the vault and return it as a visual content block so you can see and analyze it. Use this to label images (patch_preamble) and associate them with relevant docs (add_association). Returns { doc_path, image_url } plus the image bytes.",
       inputSchema: {
         type: "object",
         properties: {
-          image_data: { type: "string", description: "Base64-encoded image bytes." },
-          media_type: { type: "string", enum: ["image/jpeg", "image/png", "image/gif", "image/webp"] },
-          description: { type: "string", description: "Your description of the image — what is shown, any visible text, context." },
-          title: { type: "string", description: "Title for the vault doc." },
-          path: { type: "string", description: "Vault path for the created doc." },
+          doc_path: { type: "string", description: "Path to the image doc, e.g. images/photo-2026-06-09.md." },
         },
-        required: ["image_data", "media_type"],
+        required: ["doc_path"],
       },
     },
   ],
@@ -290,7 +286,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req): Promise<CallToolRes
     case "write_doc":         return await writeDoc(ctx, a) as CallToolResult;
     case "create_child":      return await createChild(ctx, a) as CallToolResult;
     case "add_association":   return await addAssociation(ctx, a) as CallToolResult;
-    case "upload_image":      return await uploadImage(ctx, a) as CallToolResult;
+    case "get_image":         return await getImage(ctx, a) as CallToolResult;
     default:
       throw new Error(`unknown tool: ${name}`);
   }
