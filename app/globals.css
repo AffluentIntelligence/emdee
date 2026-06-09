@@ -1628,6 +1628,60 @@ a.sidebar-footer-btn { text-decoration: none; }
   flex-shrink: 0;
 }
 
+/* ── Drag-and-drop image upload ─────────────────────────── */
+.content {
+  position: relative;
+}
+
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  background: rgba(80, 64, 232, 0.08);
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.drag-overlay-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.2px;
+}
+
+.modal-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modal-radio-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.modal-radio-option input[type="radio"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.modal-error {
+  font-size: 12px;
+  color: #ef4444;
+  margin: 0 0 12px;
+}
+
 /* ── Log / History view ─────────────────────────────────── */
 .log-view {
   display: flex;

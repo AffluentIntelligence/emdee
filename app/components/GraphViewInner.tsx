@@ -119,6 +119,8 @@ interface PlacedNode {
   kind: "focal" | "layer1" | "sibling" | "layer2";
   category: Category;
   position: { x: number; y: number };
+  isImageDoc?: boolean;
+  imageUrl?: string;
 }
 
 interface PlacedEdge {
@@ -651,7 +653,11 @@ function syncGraph(
       const startPos = outsidePositionFrom(nd.position);
       node = cy.add({
         group: "nodes",
-        data: { id: nd.id, label: nd.label, kind: nd.kind, category: nd.category },
+        data: {
+          id: nd.id, label: nd.label, kind: nd.kind, category: nd.category,
+          ...(nd.isImageDoc ? { isImageDoc: true } : {}),
+          ...(nd.imageUrl ? { imageUrl: nd.imageUrl } : {}),
+        },
         position: { ...startPos },
       });
       node.style("opacity", 0);
@@ -663,6 +669,8 @@ function syncGraph(
       node.data("kind", nd.kind);
       node.data("label", nd.label);
       node.data("category", nd.category);
+      if (nd.isImageDoc) node.data("isImageDoc", true);
+      if (nd.imageUrl) node.data("imageUrl", nd.imageUrl);
       node.animate(
         { position: nd.position, style: { opacity: 1 } },
         { duration: ANIM_MS, easing: "ease-in-out" }
@@ -891,6 +899,25 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
         // pulse window. The data is removed by the pulse effect's
         // timeout, restoring the default border style.
         {
+          selector: "node[?isImageDoc]",
+          style: {
+            shape: "rectangle",
+            width: 80,
+            height: 60,
+            "border-width": 2,
+            "border-color": "#d1d5db",
+            "background-color": "#f3f4f6",
+          },
+        },
+        {
+          selector: "node[imageUrl]",
+          style: {
+            "background-image": "data(imageUrl)",
+            "background-fit": "cover",
+            "background-image-opacity": 1,
+          },
+        },
+        {
           selector: "node[pulseColor]",
           style: {
             "border-width": 5,
@@ -974,7 +1001,15 @@ export function GraphViewInner({ index, activePath, onSelect, onAddChild, onAddA
     if (!focalId || !index.docs.some((d) => d.path === focalId)) {
       return null;
     }
-    return placeLayout(index, focalId, page, forceBranchLayout);
+    const l = placeLayout(index, focalId, page, forceBranchLayout);
+    for (const nd of l.nodes) {
+      if (!nd.id.startsWith("images/")) continue;
+      nd.isImageDoc = true;
+      const doc = index.docs.find((d) => d.path === nd.id);
+      const m = doc?.content?.match(/!\[.*?\]\((https?:\/\/[^)]+)\)/);
+      if (m) nd.imageUrl = m[1];
+    }
+    return l;
   }, [focalId, page, index, forceBranchLayout]);
 
   useEffect(() => {
